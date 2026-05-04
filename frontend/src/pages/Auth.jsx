@@ -230,8 +230,14 @@ export default function Auth() {
                   <div><label style={s.label}>Grad Year</label>
                     <select style={s.sel} value={signup.gradyear} onChange={e=>setSignup({...signup,gradyear:e.target.value})}>
                       <option value="">Year...</option>
-                      {Array.from({length: 10}, (_, i) => new Date().getFullYear() -10+ i)
-  .map(y => <option key={y}>{y}</option>)}
+                      // Replace the gradyear select:
+                                <input
+                               type="number" min="1990" max="2035"
+                               placeholder="e.g. 2025"
+                               style={s.inp}
+                               value={signup.gradyear}
+                               onChange={e => setSignup({...signup, gradyear: e.target.value})}
+                                      />
                     </select>
                   </div>
                 </div>

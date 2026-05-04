@@ -772,3 +772,37 @@ export function buildTasksForRole(roleId) {
   };
   return DB[roleId] || { beginner:[], intermediate:[], hard:[] };
 }
+export function getStarterCodeForLanguage(task, language) {
+  if (!task) return '';
+
+  // If language is JavaScript or TypeScript, return default
+  if (language === 'JavaScript' || language === 'TypeScript') {
+    return task.starterCode;
+  }
+
+  // Generate language-specific starter based on task title
+  const title = task.title || '';
+  const desc  = task.desc?.replace(/<[^>]*>/g, '') || '';
+
+  if (language === 'Python') {
+    return `# ${title} (Python)\n# ${desc.slice(0, 100)}\n\n# TODO: Write your Python solution here\n\nif __name__ == '__main__':\n    pass`;
+  }
+
+  if (language === 'Java') {
+    return `// ${title} (Java)\npublic class Solution {\n    // TODO: Write your Java solution here\n    \n    public static void main(String[] args) {\n        // Test your solution\n    }\n}`;
+  }
+
+  if (language === 'SQL') {
+    return `-- ${title} (SQL)\n-- TODO: Write your SQL query here\n\nSELECT *\nFROM table_name\nWHERE condition;`;
+  }
+
+  if (language === 'R') {
+    return `# ${title} (R)\n# TODO: Write your R solution here\n\n# Load required libraries\n# library(tidyverse)\n\n# Your code here\n`;
+  }
+
+  if (language === 'Excel / VBA') {
+    return `' ${title} (Excel VBA)\n' TODO: Write your VBA solution here\n\nSub Solution()\n    ' Your code here\n    \nEnd Sub`;
+  }
+
+  return task.starterCode;
+}
