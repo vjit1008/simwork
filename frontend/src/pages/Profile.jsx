@@ -1,7 +1,8 @@
 import { useAuth } from '../context/AuthContext';
 import { useSim }  from '../context/SimContext';
 import { useNavigate } from 'react-router-dom';
-
+import { LEADERBOARD_OTHERS } from '../data/simulations';
+import { showToast } from '../components/Toast';
 export default function Profile() {
   const { user }    = useAuth();
   const { sims }    = useSim();
@@ -10,6 +11,12 @@ export default function Profile() {
   const fullName = user ? `${user.fname||''} ${user.lname||''}`.trim() : 'User';
   const done = sims.filter(s=>s.status==='done').length;
 
+   const sorted = [
+    { name: fullName, score: user?.xp || 0, isMe: true },
+    ...LEADERBOARD_OTHERS
+  ].sort((a, b) => b.score - a.score);
+
+  const myRank = '#' + (sorted.findIndex(e => e.isMe) + 1);
   const card = { background:'var(--s1)', border:'1px solid var(--border)', borderRadius:12, padding:20, marginBottom:12 };
 
   return (
@@ -23,16 +30,25 @@ export default function Profile() {
           <div style={{fontSize:13,color:'var(--muted2)',marginBottom:12}}>📍 {user?.city||'India'}</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {user?.role&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'rgba(124,110,250,.12)',border:'1px solid rgba(124,110,250,.2)',color:'var(--accent)'}}>{user.role}</span>}
-            {(user?.skills||[]).slice(0,4).map(sk=><span key={sk} style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'rgba(124,110,250,.12)',border:'1px solid rgba(124,110,250,.2)',color:'var(--accent)'}}>{sk}</span>)}
+            {(Array.isArray(user?.skills) ? user.skills : (user?.skills||'').split(',').map(s=>s.trim()).filter(Boolean))
+  .slice(0,4).map(sk =><span key={sk} style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'rgba(124,110,250,.12)',border:'1px solid rgba(124,110,250,.2)',color:'var(--accent)'}}>{sk}</span>)}
             {user?.degree&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'rgba(96,165,250,.1)',border:'1px solid rgba(96,165,250,.2)',color:'var(--sky)'}}>🎓 {user.degree}</span>}
           </div>
         </div>
-        <button onClick={()=>navigator.clipboard.writeText(window.location.href)} style={{padding:'10px 20px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer'}}>Share Profile</button>
+        <button
+  onClick={() => {
+    navigator.clipboard.writeText(window.location.href);
+    showToast('Profile link copied! 🔗');
+  }}
+  style={{padding:'10px 20px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer'}}
+>
+  Share Profile
+</button>
       </div>
 
       {/* Stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:24}}>
-        {[['Total XP','var(--accent)',user?.xp||0],['Sims Done','var(--accent2)',done],['Certificates','var(--accent3)',(user?.certs||[]).length],['Rank', 'var(--rose)', '#' + (sorted.findIndex(e => e.isMe) + 1)]].map(([l,c,v])=>(
+        {[['Total XP','var(--accent)',user?.xp||0],['Sims Done','var(--accent2)',done],['Certificates','var(--accent3)',(user?.certs||[]).length],['Rank', 'var(--rose)', myRank]].map(([l,c,v])=>(
           <div key={l} style={{...card,textAlign:'center',marginBottom:0}}>
             <div style={{fontSize:28,fontWeight:800,color:c,letterSpacing:'-.03em'}}>{v}</div>
             <div style={{fontSize:11,color:'var(--muted2)',marginTop:4}}>{l}</div>
