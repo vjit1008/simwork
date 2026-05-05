@@ -91,7 +91,7 @@ export default function Landing() {
     h2: { fontFamily:"'Syne', sans-serif", fontSize:'clamp(2rem,4vw,3rem)', fontWeight:800, letterSpacing:-1, lineHeight:1.1, marginBottom:'1rem' },
     sub: { color:'#8891b0', fontSize:'1.05rem', maxWidth:560, fontWeight:300, lineHeight:1.8 },
     card: { background:'#0d1120', border:'1px solid rgba(255,255,255,0.08)', borderRadius:16, padding:'2rem', transition:'all .3s' },
-    btn: { background:'#6c63ff', color:'#fff', border:'none', padding:'14px 28px', borderRadius:10, fontFamily:"'DM Sans', sans-serif", fontSize:'0.95rem', fontWeight:500, cursor:'pointer', textDecoration:'none', display:'inlineflex', alignItems:'center', gap:8, transition:'all .2s' },
+    btn: { background:'#6c63ff', color:'#fff', border:'none', padding:'14px 28px', borderRadius:10, fontFamily:"'DM Sans', sans-serif", fontSize:'0.95rem', fontWeight:500, cursor:'pointer', textDecoration:'none', display:'inline-flex', alignItems:'center', gap:8, transition:'all .2s' },
     btnGhost: { background:'transparent', color:'#f0f2ff', border:'1px solid rgba(255,255,255,0.15)', padding:'14px 28px', borderRadius:10, fontSize:'0.95rem', cursor:'pointer', transition:'all .2s' },
     divider: { border:'none', borderTop:'1px solid rgba(255,255,255,0.08)', margin:0 },
   };
@@ -185,8 +185,8 @@ export default function Landing() {
         <div className="hero-orb" style={{width:400,height:400,background:'rgba(0,212,170,0.15)',top:'30%',right:'5%'}}/>
         <div className="hero-orb" style={{width:300,height:300,background:'rgba(255,107,157,0.1)',bottom:'20%',left:'30%'}}/>
 
-        <div style={{display:'inlineflex',alignItems:'center',gap:8,background:'rgba(108,99,255,0.15)',border:'1px solid rgba(108,99,255,0.3)',borderRadius:100,padding:'6px 16px',fontSize:'0.8rem',color:'#a5a0ff',marginBottom:'2rem',animation:'fadeUp .8s ease both',letterSpacing:.5}}>
-          <span style={{width:6,height:6,background:'#6c63ff',borderRadius:'50%',display:'inlineblock',animation:'pulse 2s infinite'}}/>
+        <div style={{display:'inline-flex',alignItems:'center',gap:8,background:'rgba(108,99,255,0.15)',border:'1px solid rgba(108,99,255,0.3)',borderRadius:100,padding:'6px 16px',fontSize:'0.8rem',color:'#a5a0ff',marginBottom:'2rem',animation:'fadeUp .8s ease both',letterSpacing:.5}}>
+          <span style={{width:6,height:6,background:'#6c63ff',borderRadius:'50%',display:'inline-block',animation:'pulse 2s infinite'}}/>
           Now in Open Beta · 12,400 candidates hired
         </div>
 
@@ -245,7 +245,7 @@ export default function Landing() {
                 <div style={{fontSize:'0.78rem',color:'#8891b0'}}>Full Stack · 14 simulations</div>
               </div>
               <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,background:'rgba(0,212,170,0.1)',border:'1px solid rgba(0,212,170,0.2)',borderRadius:100,padding:'4px 12px',fontSize:'0.75rem',color:'#00d4aa'}}>
-                <span style={{width:6,height:6,background:'#00d4aa',borderRadius:'50%',animation:'pulse 2s infinite',display:'inlineblock'}}/>
+                <span style={{width:6,height:6,background:'#00d4aa',borderRadius:'50%',animation:'pulse 2s infinite',display:'inline-block'}}/>
                 Verified
               </div>
             </div>
@@ -299,7 +299,7 @@ export default function Landing() {
           <div style={{background:'#141826',borderBottom:'1px solid rgba(255,255,255,0.08)',padding:'1rem 1.5rem',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
             <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'0.85rem',color:'#00d4aa'}}>arena/challenge-042 · REST API Sprint</span>
             <div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(255,107,107,0.15)',border:'1px solid rgba(255,107,107,0.3)',borderRadius:100,padding:'3px 10px',fontSize:'0.75rem',color:'#ff6b6b'}}>
-              <span style={{width:6,height:6,background:'#ff6b6b',borderRadius:'50%',animation:'pulse 1s infinite',display:'inlineblock'}}/>LIVE
+              <span style={{width:6,height:6,background:'#ff6b6b',borderRadius:'50%',animation:'pulse 1s infinite',display:'inline-block'}}/>LIVE
             </div>
           </div>
           <div className="mkt-arena-split" style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
@@ -379,7 +379,7 @@ export default function Landing() {
                 <div style={{fontSize:'0.85rem',fontWeight:500,marginBottom:4}}>{p.name}</div>
                 <div style={{fontFamily:"'Syne',sans-serif",fontSize:'1.4rem',fontWeight:800,color:p.color,marginBottom:8}}>{p.xp} XP</div>
                 <Sparkline data={p.data} color={p.color}/>
-                <div style={{marginTop:8,display:'inlineflex',alignItems:'center',gap:6,padding:'4px 12px',borderRadius:100,fontSize:'0.78rem',fontWeight:500,background:p.color+'22',color:p.color,border:`1px solid ${p.color}33`}}>{p.label}</div>
+                <div style={{marginTop:8,display:'inline-flex',alignItems:'center',gap:6,padding:'4px 12px',borderRadius:100,fontSize:'0.78rem',fontWeight:500,background:p.color+'22',color:p.color,border:`1px solid ${p.color}33`}}>{p.label}</div>
               </div>
             ))}
           </div>
@@ -402,7 +402,7 @@ export default function Landing() {
               <div>
                 <div style={{fontFamily:"'Syne',sans-serif",fontSize:'1.2rem',fontWeight:800,color:'#1a1a2e'}}>Vishvajit Gadakari</div>
                 <div style={{fontSize:'0.85rem',color:'#6b7280',marginTop:2}}>Software Developer · Pune</div>
-                <div style={{marginTop:8,display:'inlineflex',alignItems:'center',gap:6,background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:'3px 10px',fontSize:'0.72rem',color:'#16a34a',fontWeight:600}}>✓ SimWork Verified</div>
+                <div style={{marginTop:8,display:'inline-flex',alignItems:'center',gap:6,background:'#f0fdf4',border:'1px solid #86efac',borderRadius:6,padding:'3px 10px',fontSize:'0.72rem',color:'#16a34a',fontWeight:600}}>✓ SimWork Verified</div>
               </div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:'1.5rem'}}>

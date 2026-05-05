@@ -49,7 +49,7 @@ function AppLayout() {
     </div>
   );
 
-  if (!isAuthenticated) {
+ if (!isAuthenticated) {
   return (
     <Routes>
       <Route path="/"     element={<Landing />} />

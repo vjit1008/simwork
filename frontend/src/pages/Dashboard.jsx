@@ -33,7 +33,7 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="dash-stats" style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:24}}>
-        {[['Total XP','var(--accent)',user?.xp||0],['Sims Done','var(--accent2)',done],['Certificates','var(--accent3)',(user?.certs||[]).length],['Rank','var(--rose)','#42']].map(([label,color,val])=>(
+        {[['Total XP','var(--accent)',user?.xp||0],['Sims Done','var(--accent2)',done],['Certificates','var(--accent3)',(user?.certs||[]).length],['Rank', 'var(--rose)', '#' + (sorted.findIndex(e => e.isMe) + 1)]].map(([label,color,val])=>(
           <div key={label} style={{background:'var(--s1)',border:'1px solid var(--border)',borderRadius:12,padding:'18px 20px'}}>
             <div style={{fontSize:28,fontWeight:800,letterSpacing:'-.03em',color,marginBottom:2}}>{val}</div>
             <div style={{fontSize:12,color:'var(--muted2)'}}>{label}</div>

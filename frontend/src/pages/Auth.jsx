@@ -16,7 +16,7 @@ export default function Auth() {
   const { login: doLogin } = useAuth();
   const navigate = useNavigate();
 
-  const DEMO = { fname:'Vishvajit', lname:'Gadakari', email:'demo@simwork.in',
+  const DEMO = { fname:'Demo', lname:'Account', email:'demo@simwork.in',
     city:'Pune', role:'Software Developer', college:'Pune University',
     degree:'B.Tech / B.E.', branch:'Computer Science', gradyear:'2025',
     skills:['JavaScript','React','Node.js','Python'],
@@ -227,19 +227,16 @@ export default function Auth() {
                       {['B.Tech / B.E.','B.Sc','BCA','MCA','M.Tech','MBA','B.Com','Other'].map(d=><option key={d}>{d}</option>)}
                     </select>
                   </div>
-                  <div><label style={s.label}>Grad Year</label>
-                    <select style={s.sel} value={signup.gradyear} onChange={e=>setSignup({...signup,gradyear:e.target.value})}>
-                      <option value="">Year...</option>
-                      // Replace the gradyear select:
-                                <input
-                               type="number" min="1990" max="2035"
-                               placeholder="e.g. 2025"
-                               style={s.inp}
-                               value={signup.gradyear}
-                               onChange={e => setSignup({...signup, gradyear: e.target.value})}
-                                      />
-                    </select>
-                  </div>
+                  <div>
+                   <label style={s.label}>Grad Year</label>
+                        <input
+                          type="number" min="1990" max="2035"
+                          placeholder="e.g. 2025"
+                           style={s.inp}
+                          value={signup.gradyear}
+                           onChange={e => setSignup({...signup, gradyear: e.target.value})}
+                          />
+                           </div>
                 </div>
                 <label style={s.label}>Skills (comma separated)</label>
                 <input style={s.inp} placeholder="JavaScript, Python, SQL" value={signup.skills} onChange={e=>setSignup({...signup,skills:e.target.value})}/>
