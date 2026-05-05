@@ -5,6 +5,7 @@ import { SimProvider } from './context/SimContext';
 import Topbar      from './components/Navbar/Topbar';
 import Sidebar     from './components/Sidebar/Sidebar';
 import Toast       from './components/Toast';
+import Landing     from './pages/Landing';  
 import Auth        from './pages/Auth';
 import Dashboard   from './pages/Dashboard';
 import Simulations from './pages/Simulations';
@@ -49,12 +50,14 @@ function AppLayout() {
   );
 
   if (!isAuthenticated) {
-    return (
-      <Routes>
-        <Route path="*" element={<Auth />} />
-      </Routes>
-    );
-  }
+  return (
+    <Routes>
+      <Route path="/"     element={<Landing />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route path="*"     element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
