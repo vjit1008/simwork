@@ -32,7 +32,7 @@ export default function Profile() {
 
       {/* Stats */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:24}}>
-        {[['Total XP','var(--accent)',user?.xp||0],['Sims Done','var(--accent2)',done],['Certificates','var(--accent3)',(user?.certs||[]).length],['Rank','var(--rose)','#42']].map(([l,c,v])=>(
+        {[['Total XP','var(--accent)',user?.xp||0],['Sims Done','var(--accent2)',done],['Certificates','var(--accent3)',(user?.certs||[]).length],['Rank', 'var(--rose)', '#' + (sorted.findIndex(e => e.isMe) + 1)]].map(([l,c,v])=>(
           <div key={l} style={{...card,textAlign:'center',marginBottom:0}}>
             <div style={{fontSize:28,fontWeight:800,color:c,letterSpacing:'-.03em'}}>{v}</div>
             <div style={{fontSize:11,color:'var(--muted2)',marginTop:4}}>{l}</div>
