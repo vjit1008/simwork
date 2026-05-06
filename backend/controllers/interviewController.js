@@ -1,7 +1,7 @@
 const OpenAI = require('openai');
 const Interview = require('../models/Interview');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+//const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const HR_QUESTIONS = [
   "Tell me about yourself and your background.",
