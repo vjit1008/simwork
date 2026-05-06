@@ -67,6 +67,7 @@ if (process.env.NODE_ENV !== 'test') {
   mongoose.connect(process.env.MONGO_URI)
     .then(() => {
       console.log('✅ MongoDB connected to:', mongoose.connection.host);
+      console.log('✅ DB name:', mongoose.connection.name);
       app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
     })
     .catch((err) => {
