@@ -10,7 +10,7 @@ export default function Settings() {
   const { resetSims } = useSim();
   const [tab, setTab] = useState('account');
   const [form, setForm] = useState({
-    name:`${user?.fname||''} ${user?.lname||''}`.trim(),
+    name:`${user?.name||''} ${user?.lname||''}`.trim(),
     email:user?.email||'',
     city:user?.city||'',
     role:user?.role||'',
@@ -29,7 +29,7 @@ export default function Settings() {
   const save = () => {
     const parts = form.name.trim().split(' ');
     update({
-      fname:parts[0], lname:parts.slice(1).join(' '),
+      name:parts[0], lname:parts.slice(1).join(' '),
       email:form.email, city:form.city, role:form.role,
       college:form.college, degree:form.degree, branch:form.branch,
       gradyear:form.gradyear,
@@ -96,7 +96,7 @@ export default function Settings() {
                   display:'flex',alignItems:'center',justifyContent:'center',
                   fontSize:20,fontWeight:800
                 }}>
-                  {((user?.fname||'?')[0]+((user?.lname||'')[0]||'')).toUpperCase()}
+                  {((user?.name||'?')[0]+((user?.lname||'')[0]||'')).toUpperCase()}
                 </div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                   {AVATAR_COLORS.map(c=>(

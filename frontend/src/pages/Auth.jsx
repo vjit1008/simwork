@@ -10,14 +10,14 @@ export default function Auth() {
   const [tab, setTab] = useState('login');
   const [login, setLogin]   = useState({ email:'', password:'' });
   const [signup, setSignup] = useState({
-    fname:'', lname:'', email:'', password:'', city:'', role:'',
+    name:'', lname:'', email:'', password:'', city:'', role:'',
     college:'', degree:'', branch:'', gradyear:'', skills:'',
   });
   const [error, setError] = useState('');
   const { login: doLogin } = useAuth();
   const navigate = useNavigate();
 
-  const DEMO = { fname:'Demo', lname:'Account', email:'demo@simwork.in',
+  const DEMO = { name:'Demo', lname:'Account', email:'demo@simwork.in',
     city:'Pune', role:'Software Developer', college:'Pune University',
     degree:'B.Tech / B.E.', branch:'Computer Science', gradyear:'2025',
     skills:['JavaScript','React','Node.js','Python'],
@@ -42,11 +42,11 @@ export default function Auth() {
 };
 
   const handleSignup = async () => {
-  if (!signup.fname||!signup.email||!signup.password) { setError('Please fill all required fields'); return; }
+  if (!signup.name||!signup.email||!signup.password) { setError('Please fill all required fields'); return; }
   if (signup.password.length < 6) { setError('Password must be at least 6 characters'); return; }
   try {
     const { data } = await API.post('/api/auth/signup', {
-      name: `${signup.fname} ${signup.lname}`.trim(),
+      name: `${signup.name} ${signup.lname}`.trim(),
       email: signup.email,
       password: signup.password,
     });
@@ -207,7 +207,7 @@ export default function Auth() {
                 <div style={{fontSize:14,color:'var(--muted2)',marginBottom:16}}>Join thousands of freshers building job-ready skills</div>
                 <div style={s.sec}>Personal Info</div>
                 <div style={s.row}>
-                  <div><label style={s.label}>First Name *</label><input style={s.inp} placeholder="First" value={signup.fname} onChange={e=>setSignup({...signup,fname:e.target.value})}/></div>
+                  <div><label style={s.label}>First Name *</label><input style={s.inp} placeholder="First" value={signup.name} onChange={e=>setSignup({...signup,name:e.target.value})}/></div>
                   <div><label style={s.label}>Last Name *</label><input style={s.inp} placeholder="Last" value={signup.lname} onChange={e=>setSignup({...signup,lname:e.target.value})}/></div>
                 </div>
                 <label style={s.label}>Email *</label>

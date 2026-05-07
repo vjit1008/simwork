@@ -658,7 +658,7 @@ Respond in this EXACT JSON format only, no other text:
               <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Stage Complete!</div>
               <div style={{ background: 'var(--s1)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, margin: '16px 0', textAlign: 'left' }}>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent)', marginBottom: 6 }}>{modalStage.cert.id}</div>
-                <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{user?.fname} {user?.lname}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{user?.name} {user?.lname}</div>
                 <div style={{ fontSize: 13, color: 'var(--muted2)', marginBottom: 8 }}>has completed the {currentSim.title} Simulation — {stageInfo.label} Stage</div>
                 <div style={{ fontSize: 12, color: 'var(--accent2)' }}>Score: <strong>{modalStage.avg}</strong>/100 · {modalStage.cert.date}</div>
               </div>

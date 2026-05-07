@@ -8,8 +8,8 @@ export default function Sidebar({ collapsed, onClose }) {
   const { user, logout } = useAuth();
   const { sims, currentSim } = useSim();
 
-  const initials = user ? ((user.fname||'?')[0]+((user.lname||'')[0]||'')).toUpperCase() : '?';
-  const fullName  = user ? `${user.fname||''} ${user.lname||''}`.trim() : 'User';
+  const initials = user ? ((user.name||'?')[0]+((user.lname||'')[0]||'')).toUpperCase() : '?';
+  const fullName  = user ? `${user.name||''} ${user.lname||''}`.trim() : 'User';
   const done      = sims.filter(s=>s.status==='done').length;
   const pct       = Math.round((done/sims.length)*100);
 

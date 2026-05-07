@@ -13,7 +13,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 const mockUser = {
-  fname: 'Vishvajit', lname: 'Gadakari',
+  name: 'Vishvajit', lname: 'Gadakari',
   email: 'test@simwork.in', xp: 750,
   avatarColor: '#7C6EFA', certs: ['cert1', 'cert2'],
   role: 'Software Developer', city: 'Pune',

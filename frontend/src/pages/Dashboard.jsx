@@ -10,8 +10,8 @@ export default function Dashboard() {
   const hour = new Date().getHours();
   const greeting = hour<12?'Good morning':hour<17?'Welcome back':'Good evening';
   const done = sims.filter(s=>s.status==='done').length;
-  const fullName = user ? `${user.fname||''} ${user.lname||''}`.trim() : 'User';
-  const initials = user ? ((user.fname||'?')[0]+((user.lname||'')[0]||'')).toUpperCase() : '?';
+  const fullName = user ? `${user.name||''} ${user.lname||''}`.trim() : 'User';
+  const initials = user ? ((user.name||'?')[0]+((user.lname||'')[0]||'')).toUpperCase() : '?';
 
   const sorted = [
     { name:fullName, score:user?.xp||0, avatar:initials, color:user?.avatarColor||'#7C6EFA', sims:done, isMe:true },
@@ -27,7 +27,7 @@ export default function Dashboard() {
 
       {/* Welcome */}
       <div style={{marginBottom:28,padding:'24px 28px',background:'linear-gradient(135deg,rgba(124,110,250,.1),rgba(52,211,153,.06))',border:'1px solid rgba(124,110,250,.15)',borderRadius:16}}>
-        <h1 style={{fontSize:26,fontWeight:800,letterSpacing:'-.03em',marginBottom:4}}>{greeting}, {user?.fname||'there'} 👋</h1>
+        <h1 style={{fontSize:26,fontWeight:800,letterSpacing:'-.03em',marginBottom:4}}>{greeting}, {user?.name||'there'} 👋</h1>
         <p style={{fontSize:14,color:'var(--muted2)'}}>Ready to level up your skills today?</p>
       </div>
 

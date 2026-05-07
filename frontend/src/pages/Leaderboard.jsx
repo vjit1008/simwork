@@ -6,8 +6,8 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const { sims } = useSim();
   const done = sims.filter(s=>s.status==='done').length;
-  const fullName = user ? `${user.fname||''} ${user.lname||''}`.trim() : 'User';
-  const initials = user ? ((user.fname||'?')[0]+((user.lname||'')[0]||'')).toUpperCase() : '?';
+  const fullName = user ? `${user.name||''} ${user.lname||''}`.trim() : 'User';
+  const initials = user ? ((user.name||'?')[0]+((user.lname||'')[0]||'')).toUpperCase() : '?';
 
   const all = [
     { name:fullName, score:user?.xp||0, avatar:initials, color:user?.avatarColor||'#7C6EFA', sims:done, isMe:true },

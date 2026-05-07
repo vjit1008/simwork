@@ -7,8 +7,8 @@ export default function Topbar({ onToggleSidebar, onToggleTheme, theme, breadcru
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  const initials = user ? ((user.fname||'?')[0] + ((user.lname||'')[0]||'')).toUpperCase() : '?';
-  const fullName = user ? `${user.fname||''} ${user.lname||''}`.trim() : 'User';
+  const initials = user ? ((user.name||'?')[0] + ((user.lname||'')[0]||'')).toUpperCase() : '?';
+  const fullName = user ? `${user.name||''} ${user.lname||''}`.trim() : 'User';
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
