@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { showToast } from '../components/Toast';
+import API from '../api/axios';
 
-const AVATAR_COLORS = ['#7C6EFA','#34D399','#F59E0B','#F87171','#60A5FA','#A78BFA','#EC4899'];
+//const AVATAR_COLORS = ['#7C6EFA','#34D399','#F59E0B','#F87171','#60A5FA','#A78BFA','#EC4899'];
 
 export default function Auth() {
   const [tab, setTab] = useState('login');
@@ -24,34 +25,39 @@ export default function Auth() {
     notifications:{email:true,browser:true,weekly:true},
     privacy:{publicProfile:true,showEducation:true,showOnLeaderboard:true} };
 
-  const handleLogin = () => {
-    if (!login.email || !login.password) { setError('Please fill all fields'); return; }
-    if (login.email === 'demo@simwork.in' && login.password === 'demo123') {
-      doLogin(DEMO); navigate('/'); showToast('Welcome back! 👋'); return;
-    }
-    const saved = JSON.parse(localStorage.getItem('simwork_accounts')||'{}');
-    const acc = saved[login.email.toLowerCase()];
-    if (!acc || acc.password !== login.password) { setError('Invalid email or password'); return; }
-    doLogin(acc); navigate('/'); showToast('Welcome back! 👋');
-  };
+ const handleLogin = async () => {
+  if (!login.email || !login.password) { setError('Please fill all fields'); return; }
+  try {
+    const { data } = await API.post('/api/auth/login', {
+      email: login.email,
+      password: login.password,
+    });
+    doLogin(data.user);
+    localStorage.setItem('token', data.token);
+    navigate('/'); 
+    showToast('Welcome back! 👋');
+  } catch (err) {
+    setError(err.response?.data?.message || 'Invalid email or password');
+  }
+};
 
-  const handleSignup = () => {
-    if (!signup.fname||!signup.lname||!signup.email||!signup.password) { setError('Please fill all required fields'); return; }
-    if (signup.password.length < 6) { setError('Password must be at least 6 characters'); return; }
-    if (!signup.role) { setError('Please select a target role'); return; }
-    const user = {
-      ...signup,
-      skills: signup.skills ? signup.skills.split(',').map(s=>s.trim()).filter(Boolean) : [],
-      avatarColor: AVATAR_COLORS[Math.floor(Math.random()*AVATAR_COLORS.length)],
-      xp:0, certs:[],
-      notifications:{email:true,browser:true,weekly:true},
-      privacy:{publicProfile:true,showEducation:true,showOnLeaderboard:true}
-    };
-    const saved = JSON.parse(localStorage.getItem('simwork_accounts')||'{}');
-    saved[signup.email.toLowerCase()] = user;
-    localStorage.setItem('simwork_accounts', JSON.stringify(saved));
-    doLogin(user); navigate('/'); showToast('Welcome to SimWork! 🚀');
-  };
+  const handleSignup = async () => {
+  if (!signup.fname||!signup.email||!signup.password) { setError('Please fill all required fields'); return; }
+  if (signup.password.length < 6) { setError('Password must be at least 6 characters'); return; }
+  try {
+    const { data } = await API.post('/api/auth/signup', {
+      name: `${signup.fname} ${signup.lname}`.trim(),
+      email: signup.email,
+      password: signup.password,
+    });
+    doLogin(data.user);
+    localStorage.setItem('token', data.token);
+    navigate('/');
+    showToast('Welcome to SimWork! 🚀');
+  } catch (err) {
+    setError(err.response?.data?.message || 'Signup failed. Please try again.');
+  }
+};
 
   const s = {
   page: {
