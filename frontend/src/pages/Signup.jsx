@@ -22,7 +22,7 @@ const Signup = () => {
     }
     setLoading(true);
     try {
-      const { data } = await API.post('/auth/signup', form);
+      const { data } = await API.post('/api/auth/signup', form);
       login(data.user, data.token);
       navigate('/dashboard');
     } catch (err) {
