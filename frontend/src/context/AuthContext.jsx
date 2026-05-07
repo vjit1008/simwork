@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-
+import API from '../api/axios';   // adjust path if needed
+import { showToast } from '../components/Toast';
 // ✅ Named export for testing
 export const AuthContext = createContext(null);
 
@@ -21,16 +22,21 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('simwork_user_v3', JSON.stringify(userData));
     } catch (e) {}
   };
-
-  const update = (partial) => {
-    setUser(prev => {
-      const next = { ...prev, ...partial };
+   
+  const update = async (partial) => {
+  try {
+    const { data } = await API.put('/api/user/me', partial);
+    if (data.success) {
+      setUser(data.user);
       try {
-        localStorage.setItem('simwork_user_v3', JSON.stringify(next));
+        localStorage.setItem('simwork_user_v3', JSON.stringify(data.user));
       } catch (e) {}
-      return next;
-    });
-  };
+    }
+  } catch (err) {
+    console.error('❌ Update failed:', err);
+    showToast('❌ Failed to save changes');
+  }
+};
 
   const logout = () => {
     setUser(null);
