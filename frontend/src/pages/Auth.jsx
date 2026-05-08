@@ -32,7 +32,7 @@ export default function Auth() {
       email: login.email,
       password: login.password,
     });
-    doLogin(data.user);
+    doLogin(data.user, data.token);
     localStorage.setItem('token', data.token);
     navigate('/'); 
     showToast('Welcome back! 👋');
@@ -50,7 +50,7 @@ export default function Auth() {
       email: signup.email,
       password: signup.password,
     });
-    doLogin(data.user);
+    doLogin(data.user, data.token);
     localStorage.setItem('token', data.token);
     navigate('/');
     showToast('Welcome to SimWork! 🚀');
