@@ -23,6 +23,8 @@ const BREADCRUMBS = {
   '/simulations': 'Simulations',
   '/profile':     'My Profile',
   '/leaderboard': 'Leaderboard',
+  '/projects':    'Projects',
+  '/teamwork':    'Teamwork',
   '/settings':    'Settings',
   '/ide':         'IDE & Tasks',
 };
@@ -58,9 +60,6 @@ function AppLayout() {
       <Route path="/"     element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="*"     element={<Navigate to="/" replace />} />
-  
-<Route path="/projects"  element={<Projects />} />
-<Route path="/teamwork"  element={<Teamwork />} />
     </Routes>
   );
 }
@@ -102,6 +101,8 @@ function AppLayout() {
             <Route path="/simulations" element={<Simulations />} />
             <Route path="/profile"     element={<Profile />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/projects"    element={<Projects />} />
+            <Route path="/teamwork"    element={<Teamwork />} />
             <Route path="/settings"    element={<Settings />} />
             <Route path="/ide"         element={<IDEPage />} />
             <Route path="*"            element={<Navigate to="/" replace />} />
