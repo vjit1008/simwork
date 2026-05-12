@@ -14,6 +14,9 @@ import Leaderboard from './pages/Leaderboard';
 import Settings    from './pages/Settings';
 import IDEPage     from './components/IDE/IDEPage';
 import './styles/global.css';
+import Projects  from './pages/Projects';
+import Teamwork  from './pages/Teamwork';
+
 
 const BREADCRUMBS = {
   '/':            'Dashboard',
@@ -55,6 +58,9 @@ function AppLayout() {
       <Route path="/"     element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="*"     element={<Navigate to="/" replace />} />
+  
+<Route path="/projects"  element={<Projects />} />
+<Route path="/teamwork"  element={<Teamwork />} />
     </Routes>
   );
 }

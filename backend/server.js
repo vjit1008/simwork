@@ -2,6 +2,9 @@ const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
 const dotenv   = require('dotenv');
+const projectRoutes      = require('./routes/projectRoutes');
+const channelRoutes      = require('./routes/channelRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 require('express-async-errors');
 
 dotenv.config();
@@ -40,6 +43,9 @@ app.use(express.json());
 
 app.use('/api/auth',      authRoutes);
 app.use('/api/interview', interviewRoutes);
+app.use('/api/projects',      projectRoutes);
+app.use('/api/channels',      channelRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/user',      userRoutes);   // ✅ registered after app exists
 
 app.get('/health', (req, res) => res.json({

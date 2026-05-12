@@ -19,6 +19,14 @@ const userSchema = new mongoose.Schema({
   certs:       [{ type: mongoose.Schema.Types.Mixed }],
   notifications: { type: mongoose.Schema.Types.Mixed, default: {} },
   privacy:       { type: mongoose.Schema.Types.Mixed, default: {} },
+
+  role: {
+  type: String,
+  enum: ['student', 'mentor', 'admin'],
+  default: 'student',
+},
+skills: [{ type: String }],
+xp: { type: Number, default: 0 },
 }, { timestamps: true });
 
 // No next() — modern Mongoose handles async pre-save via returned Promise

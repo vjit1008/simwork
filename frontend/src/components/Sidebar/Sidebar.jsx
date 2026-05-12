@@ -46,6 +46,7 @@ export default function Sidebar({ collapsed, onClose }) {
     prog:{ padding:'12px 14px', marginTop:'auto', borderTop:'1px solid var(--border)' },
     bar:{ height:4, background:'var(--s3)', borderRadius:2, overflow:'hidden', marginTop:6 },
     fill:{ height:'100%', width:pct+'%', background:'linear-gradient(90deg,var(--accent),var(--accent2))', borderRadius:2, transition:'width .4s' },
+    
   };
 
   return (
@@ -95,6 +96,12 @@ export default function Sidebar({ collapsed, onClose }) {
         </div>
         <div style={s.item(isActive('/leaderboard'))} onClick={()=>go('/leaderboard')}>
           <span style={s.icon}>🏆</span>Leaderboard
+        </div>
+        <div style={s.item(isActive('/projects'))} onClick={()=>go('/projects')}>
+          <span style={s.icon}>📁</span>Projects
+        </div>
+        <div style={s.item(isActive('/teamwork'))} onClick={()=>go('/teamwork')}>
+          <span style={s.icon}>💬</span>Teamwork
         </div>
         {currentSim && (
           <>
