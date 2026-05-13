@@ -2,7 +2,7 @@
 // Add this floating panel to your Simulation page
 
 import { useState } from "react";
-import { getSimulationHint, evaluateSimulationAnswer } from "../../services/geminiService";
+import { getSimulationHint, evaluateSimulationAnswer } from "../../services/GeminiService.js";
 
 export default function AISimulationCoach({ task, role = "Employee" }) {
   // task = { id, description, rubric }  — pass from your simulation state
