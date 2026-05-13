@@ -1,6 +1,7 @@
 import { useAuth } from '../context/AuthContext';
 import { useSim }  from '../context/SimContext';
 import { LEADERBOARD_OTHERS } from '../data/simulations';
+import AILeaderboardInsights from '../components/AI/AILeaderboardInsights';
 
 export default function Leaderboard() {
   const { user } = useAuth();
@@ -20,6 +21,13 @@ export default function Leaderboard() {
         <h1 style={{fontSize:22,fontWeight:800,letterSpacing:'-.02em',marginBottom:6}}>🏆 Leaderboard</h1>
         <p style={{fontSize:14,color:'var(--muted2)'}}>Top performers this month</p>
       </div>
+      
+      <AILeaderboardInsights 
+        currentUser={user}
+        topUsers={all.slice(0, 5)}
+        userRank={all.findIndex(u => u.isMe) + 1}
+      />
+      
       <div style={{background:'var(--s1)',border:'1px solid var(--border)',borderRadius:14,overflow:'hidden'}}>
         {all.map((l,i)=>(
           <div key={i} style={{display:'flex',alignItems:'center',gap:14,padding:'14px 20px',borderBottom:'1px solid var(--border)',background:l.isMe?'rgba(124,110,250,.06)':'transparent'}}>

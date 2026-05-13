@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSim } from '../context/SimContext';
+import { useAuth } from '../context/AuthContext';
 import { buildTasksForRole, STAGES } from '../data/simulations';
 import { showToast } from '../components/Toast';
+import AISimulationCoach from '../components/AI/AISimulationCoach';
 
 export default function Simulations() {
-  const { sims, setCurrentSim, setCurrentStage, setCurrentTask, setTaskResults, setValidationPassed } = useSim();
+  const { sims, setCurrentSim, setCurrentStage, setCurrentTask, setTaskResults, setValidationPassed, currentSim, currentTask } = useSim();
+  const { user } = useAuth();
   const [filter, setFilter] = useState('all');
   const navigate = useNavigate();
 
@@ -74,6 +77,13 @@ export default function Simulations() {
           );
         })}
       </div>
+      
+      {/* AI Coach Floating Button */}
+      {currentSim && (
+        <div style={{position:'fixed',bottom:24,right:24,zIndex:50}}>
+          <AISimulationCoach task={currentTask} role={user?.role} />
+        </div>
+      )}
     </div>
   );
 }

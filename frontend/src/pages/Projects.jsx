@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { fetchProjects, pushWork, pullBack } from '../api/projects';
 import { useAuth } from '../context/AuthContext';
-
+import AIProjectIdeas from '../components/AI/AIProjectIdeas';
+  
 export default function Projects() {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
@@ -34,6 +35,7 @@ export default function Projects() {
   return (
     <div style={s.page}>
       <h2 style={s.heading}>Projects</h2>
+      <AIProjectIdeas />
       {projects.length === 0 && (
         <div style={s.empty}>No projects assigned yet.</div>
       )}
