@@ -143,4 +143,5 @@ Return ONLY this JSON:
   const raw = await callGemini(prompt, system);
   const cleaned = raw.replace(/```json|```/g, "").trim();
   return JSON.parse(cleaned);
+  
 }   
