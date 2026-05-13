@@ -2,7 +2,7 @@
 // Add this to your Leaderboard page — shows AI-personalized insights
 
 import { useState, useEffect } from "react";
-import { getLeaderboardInsights, getChallengeRecommendation } from "../../services/geminiService.js";
+import { getLeaderboardInsights, getChallengeRecommendation } from "../../services/GeminiService.js";
 
 export default function AILeaderboardInsights({ currentUser, topUsers, userRank }) {
   // currentUser = { score, role, completedChallenges, pointsToNextRank }

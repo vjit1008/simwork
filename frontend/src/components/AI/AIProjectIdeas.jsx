@@ -2,7 +2,7 @@
 // Drop this into your Projects page — it adds a Gemini-powered idea generator
 
 import { useState } from "react";
-import { getProjectIdeas } from "../../services/geminiService.js";
+import { getProjectIdeas } from "../../services/GeminiService.js";
 
 const ROLES = ["Software Developer", "Data Analyst", "UI/UX Designer", "Project Manager", "DevOps Engineer", "Marketing Specialist"];
 const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced"];
