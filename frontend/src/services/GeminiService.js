@@ -2,7 +2,7 @@
 // Centralized Gemini API service for SimWork
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/Gemini 3 Flash Live:generateContent";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/Gemini 2 Flash:generateContent";
 
 async function callGemini(prompt, systemInstruction = "") {
   const response = await fetch(`${GEMINI_BASE_URL}?key=${GEMINI_API_KEY}`, {
