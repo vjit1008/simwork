@@ -1,3 +1,9 @@
+/**
+ * SimWork — Simulate Before You Apply
+ * Copyright (c) 2025 Vishvajit Gadakari. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * https://simwork.vercel.app
+ */
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
