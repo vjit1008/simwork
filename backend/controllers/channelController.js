@@ -12,7 +12,7 @@ const getChannels = async (req, res) => {
   }
 };
 
-const getChannel = async (req, res) => {
+/**const getChannel = async (req, res) => {
   try {
     const channel = await Channel.findById(req.params.id)
       .populate('messages.sender', 'name');
@@ -21,7 +21,7 @@ const getChannel = async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
-};
+};**/
 
 const createChannel = async (req, res) => {
   try {
