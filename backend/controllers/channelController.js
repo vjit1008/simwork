@@ -2,10 +2,10 @@ const Channel = require('../models/Channel');
 
 const getChannels = async (req, res) => {
   try {
-    // ✅ Return ALL channels, not just ones user is member of
+    // ✅ ALL users see ALL channels — no filte
     const channels = await Channel.find()
       .select('-messages')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
     res.json({ success: true, channels });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -37,6 +37,30 @@ const createChannel = async (req, res) => {
       projectId: projectId || null,
       department: department || 'general',
       members: allUserIds, // ✅ everyone is a member
+    });
+
+    res.status(201).json({ success: true, channel });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+const createChannel = async (req, res) => {
+  try {
+    const { name, projectId, department } = req.body;
+    if (!name?.trim()) return res.status(400).json({ success: false, message: 'Channel name required.' });
+
+    // ✅ Prevent duplicate channel names
+    const existing = await Channel.findOne({ name: name.trim().toLowerCase() });
+    if (existing) return res.status(400).json({ success: false, message: 'Channel already exists.' });
+
+    const User = require('../models/User');
+    const allUsers = await User.find().select('_id');
+
+    const channel = await Channel.create({
+      name: name.trim().toLowerCase(),
+      projectId: projectId || null,
+      department: department || 'general',
+      members: allUsers.map(u => u._id),
     });
 
     res.status(201).json({ success: true, channel });
