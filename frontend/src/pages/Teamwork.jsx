@@ -23,6 +23,15 @@ export default function Teamwork() {
   }, [active]);
 
   useEffect(() => {
+  fetchChannels().then(r => {
+    const chs = r.data.channels;
+    setChannels(chs);
+    // ✅ Auto-select first channel
+    if (chs.length > 0 && !active) setActive(chs[0]);
+  }).catch(console.error);
+}, []);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
