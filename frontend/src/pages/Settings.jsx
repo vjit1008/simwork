@@ -1,226 +1,333 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSim }  from '../context/SimContext';
 import { showToast } from '../components/Toast';
+import API from '../api/axios';
 
-const AVATAR_COLORS = ['#7C6EFA','#34D399','#F59E0B','#F87171','#60A5FA','#A78BFA','#EC4899'];
+const AVATAR_COLORS = [
+  '#7C6EFA','#34D399','#F59E0B',
+  '#F87171','#60A5FA','#A78BFA','#EC4899'
+];
+
+const SECTIONS = ['Account','Education','Notifications','Privacy','Danger Zone'];
 
 export default function Settings() {
   const { user, update, logout } = useAuth();
-  const { resetSims } = useSim();
-  const [tab, setTab] = useState('account');
+  const [section, setSection] = useState('Account');
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    name:`${user?.name||''} ${user?.lname||''}`.trim(),
-    email:user?.email||'',
-    city:user?.city||'',
-    role:user?.role||'',
-    college:user?.college||'',
-    degree:user?.degree||'',
-    branch:user?.branch||'',
-    gradyear:user?.gradyear||'',
-    skills:(user?.skills||[]).join(', ')
+    name:        user?.name        || '',
+    email:       user?.email       || '',
+    city:        user?.city        || '',
+    role:        user?.role        || '',
+    avatarColor: user?.avatarColor || '#7C6EFA',
+    college:     user?.college     || '',
+    degree:      user?.degree      || '',
+    branch:      user?.branch      || '',
+    gradyear:    user?.gradyear    || '',
+    skills:      Array.isArray(user?.skills) ? user.skills.join(', ') : '',
+    notifications: user?.notifications || { email: true, browser: true, weekly: true },
+    privacy:       user?.privacy       || { publicProfile: true, showEducation: true, showOnLeaderboard: true },
   });
 
-  const inp = { background:'var(--s2)', border:'1px solid var(--border2)', borderRadius:8, padding:'9px 12px', color:'var(--text)', fontSize:14, outline:'none', width:220, maxWidth:'100%' };
-  const sel = { ...inp, cursor:'pointer' };
-  const navItem = (t) => ({ padding:'10px 14px', borderRadius:8, fontSize:13, fontWeight:500, cursor:'pointer', display:'flex', alignItems:'center', gap:8, color:tab===t?'var(--accent)':'var(--muted2)', background:tab===t?'rgba(124,110,250,.12)':'transparent' });
-  const row = { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderBottom:'1px solid var(--border)', gap:12, flexWrap:'wrap' };
+  // Sync form if user context updates
+  useEffect(() => {
+    if (user) {
+      setForm(f => ({
+        ...f,
+        name:        user.name        || '',
+        email:       user.email       || '',
+        city:        user.city        || '',
+        role:        user.role        || '',
+        avatarColor: user.avatarColor || '#7C6EFA',
+        college:     user.college     || '',
+        degree:      user.degree      || '',
+        branch:      user.branch      || '',
+        gradyear:    user.gradyear    || '',
+        skills:      Array.isArray(user.skills) ? user.skills.join(', ') : '',
+        notifications: user.notifications || { email: true, browser: true, weekly: true },
+        privacy:       user.privacy       || { publicProfile: true, showEducation: true, showOnLeaderboard: true },
+      }));
+    }
+  }, [user]);
 
-  const save = () => {
-    const parts = form.name.trim().split(' ');
-    update({
-      name:parts[0], lname:parts.slice(1).join(' '),
-      email:form.email, city:form.city, role:form.role,
-      college:form.college, degree:form.degree, branch:form.branch,
-      gradyear:form.gradyear,
-      skills:form.skills.split(',').map(s=>s.trim()).filter(Boolean)
-    });
-    showToast('✅ Settings saved!');
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const setNot = (key, val) => setForm(f => ({ ...f, notifications: { ...f.notifications, [key]: val } }));
+  const setPri = (key, val) => setForm(f => ({ ...f, privacy: { ...f.privacy, [key]: val } }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        skills: form.skills.split(',').map(s => s.trim()).filter(Boolean),
+      };
+      const { data } = await API.put('/api/users/me', payload);
+      update(data.user);
+      showToast('Settings saved! ✅');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to save. Try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const Toggle = ({ val, onToggle }) => (
-    <button onClick={onToggle} style={{width:44,height:24,borderRadius:12,border:'none',cursor:'pointer',position:'relative',background:val?'var(--accent)':'var(--s3)',flexShrink:0}}>
-      <div style={{position:'absolute',top:3,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'left .2s',left:val?23:3}}/>
-    </button>
-  );
+  const initials = (form.name || 'U')
+    .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <div style={{padding:'28px 32px',overflowY:'auto',flex:1}}>
-      <div style={{marginBottom:24}}>
-        <h1 style={{fontSize:22,fontWeight:800}}>⚙️ Settings</h1>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'200px 1fr',gap:24}}>
+    <div style={s.page}>
+      <h2 style={s.pageTitle}>⚙️ Settings</h2>
 
-        {/* Nav */}
-        <div style={{background:'var(--s1)',border:'1px solid var(--border)',borderRadius:14,padding:8,height:'fit-content'}}>
-          {[['account','👤 Account'],['education','🎓 Education'],['notifications','🔔 Notifications'],['privacy','🔒 Privacy'],['danger','⚠️ Danger Zone']].map(([t,l])=>(
-            <div key={t} style={{
-              ...navItem(t),
-              color:t==='danger'&&tab!==t?'var(--rose)':tab===t?'var(--accent)':'var(--muted2)'
-            }} onClick={()=>setTab(t)}>{l}</div>
+      <div style={s.layout}>
+        {/* Sidebar */}
+        <div style={s.sidebar}>
+          {SECTIONS.map(sec => (
+            <div
+              key={sec}
+              style={{ ...s.navItem, ...(section === sec ? s.navActive : {}) }}
+              onClick={() => setSection(sec)}
+            >
+              {sec === 'Account'       && '👤 '}
+              {sec === 'Education'     && '🎓 '}
+              {sec === 'Notifications' && '🔔 '}
+              {sec === 'Privacy'       && '🔒 '}
+              {sec === 'Danger Zone'   && '⚠️ '}
+              {sec}
+            </div>
           ))}
         </div>
 
-        {/* Panel */}
-        <div style={{background:'var(--s1)',border:'1px solid var(--border)',borderRadius:14,padding:28}}>
+        {/* Main panel */}
+        <div style={s.panel}>
 
-          {/* Account */}
-          {tab==='account'&&<>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Account Settings</div>
-            <div style={{fontSize:13,color:'var(--muted2)',marginBottom:28}}>Manage your credentials and preferences</div>
-            {[
-              ['Full Name','text',form.name,v=>setForm({...form,name:v})],
-              ['Email','email',form.email,v=>setForm({...form,email:v})],
-              ['City','text',form.city,v=>setForm({...form,city:v})]
-            ].map(([l,t,v,s])=>(
-              <div key={l} style={row}>
-                <div><div style={{fontSize:14,fontWeight:600}}>{l}</div></div>
-                <input style={inp} type={t} value={v} onChange={e=>s(e.target.value)}/>
-              </div>
-            ))}
-            <div style={row}>
-              <div><div style={{fontSize:14,fontWeight:600}}>Target Role</div></div>
-              <select style={sel} value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
-                {['Software Developer','Data Scientist','Finance Analyst','UI/UX Designer','DevOps Engineer','Product Manager','AI Engineer'].map(r=>(
-                  <option key={r}>{r}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{marginTop:16}}>
-              <div style={{fontSize:14,fontWeight:600,marginBottom:12}}>Avatar Color</div>
-              <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
-                <div style={{
-                  width:56,height:56,borderRadius:'50%',
-                  background:(user?.avatarColor||'#7C6EFA')+'33',
-                  color:user?.avatarColor||'#7C6EFA',
-                  display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:20,fontWeight:800
-                }}>
-                  {((user?.name||'?')[0]+((user?.lname||'')[0]||'')).toUpperCase()}
+          {/* ── ACCOUNT ── */}
+          {section === 'Account' && (
+            <div>
+              <h3 style={s.sectionTitle}>Account Settings</h3>
+              <p style={s.sectionSub}>Manage your credentials and preferences</p>
+
+              {/* Avatar */}
+              <div style={s.avatarRow}>
+                <div style={{ ...s.avatar, background: form.avatarColor }}>
+                  {initials}
                 </div>
-                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                  {AVATAR_COLORS.map(c=>(
-                    <div key={c} onClick={()=>update({avatarColor:c})} style={{
-                      width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',
-                      border:user?.avatarColor===c?'2px solid #fff':'2px solid transparent',
-                      transform:user?.avatarColor===c?'scale(1.15)':'scale(1)',
-                      transition:'all .15s'
-                    }}/>
-                  ))}
+                <div>
+                  <p style={s.label}>Avatar Color</p>
+                  <div style={s.colorRow}>
+                    {AVATAR_COLORS.map(c => (
+                      <div
+                        key={c}
+                        onClick={() => set('avatarColor', c)}
+                        style={{
+                          ...s.colorDot,
+                          background: c,
+                          outline: form.avatarColor === c ? `3px solid ${c}` : 'none',
+                          outlineOffset: 2,
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-            <button onClick={save} style={{marginTop:24,padding:'10px 28px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer'}}>
-              Save Changes
-            </button>
-          </>}
 
-          {/* Education */}
-          {tab==='education'&&<>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Education</div>
-            <div style={{fontSize:13,color:'var(--muted2)',marginBottom:28}}>Your academic background</div>
-            {[
-              ['College',form.college,v=>setForm({...form,college:v})],
-              ['Branch',form.branch,v=>setForm({...form,branch:v})],
-              ['Skills',form.skills,v=>setForm({...form,skills:v})]
-            ].map(([l,v,s])=>(
-              <div key={l} style={row}>
-                <div><div style={{fontSize:14,fontWeight:600}}>{l}</div></div>
-                <input style={inp} value={v} onChange={e=>s(e.target.value)}/>
+              <div style={s.grid2}>
+                <div>
+                  <p style={s.label}>Full Name</p>
+                  <input style={s.inp} value={form.name} onChange={e => set('name', e.target.value)} />
+                </div>
+                <div>
+                  <p style={s.label}>Email</p>
+                  <input style={{ ...s.inp, opacity: 0.6 }} value={form.email} disabled />
+                </div>
+                <div>
+                  <p style={s.label}>City</p>
+                  <input style={s.inp} value={form.city} onChange={e => set('city', e.target.value)} placeholder="e.g. Pune" />
+                </div>
+                <div>
+                  <p style={s.label}>Target Role</p>
+                  <select style={s.sel} value={form.role} onChange={e => set('role', e.target.value)}>
+                    <option value="">Select...</option>
+                    {['Software Developer','Data Scientist','Finance Analyst','UI/UX Designer','DevOps Engineer','AI Engineer'].map(r => (
+                      <option key={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            ))}
-            <div style={row}>
-              <div><div style={{fontSize:14,fontWeight:600}}>Degree</div></div>
-              <select style={sel} value={form.degree} onChange={e=>setForm({...form,degree:e.target.value})}>
-                {['','B.Tech / B.E.','B.Sc','BCA','MCA','M.Tech','MBA','B.Com','Other'].map(d=>(
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <div style={row}>
-              <div><div style={{fontSize:14,fontWeight:600}}>Graduation Year</div></div>
+
+              <p style={s.label}>Skills (comma separated)</p>
               <input
-                type="number"
-                min="1990"
-                max="2035"
-                placeholder="e.g. 2025"
-                style={inp}
-                value={form.gradyear}
-                onChange={e=>setForm({...form,gradyear:e.target.value})}
+                style={s.inp}
+                value={form.skills}
+                onChange={e => set('skills', e.target.value)}
+                placeholder="JavaScript, Python, React, SQL"
               />
-            </div>
-            <button onClick={save} style={{marginTop:24,padding:'10px 28px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:'pointer'}}>
-              Save Education
-            </button>
-          </>}
 
-          {/* Notifications */}
-          {tab==='notifications'&&<>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Notifications</div>
-            <div style={{fontSize:13,color:'var(--muted2)',marginBottom:28}}>Control how SimWork contacts you</div>
-            {[
-              ['Email Notifications','email'],
-              ['Browser Notifications','browser'],
-              ['Weekly Progress Report','weekly']
-            ].map(([l,k])=>(
-              <div key={k} style={row}>
-                <div><div style={{fontSize:14,fontWeight:600}}>{l}</div></div>
-                <Toggle
-                  val={user?.notifications?.[k]??true}
-                  onToggle={()=>update({notifications:{...user?.notifications,[k]:!(user?.notifications?.[k]??true)}})}
-                />
-              </div>
-            ))}
-          </>}
-
-          {/* Privacy */}
-          {tab==='privacy'&&<>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Privacy</div>
-            <div style={{fontSize:13,color:'var(--muted2)',marginBottom:28}}>Control your visibility</div>
-            {[
-              ['Public Profile','publicProfile'],
-              ['Show Education','showEducation'],
-              ['Show on Leaderboard','showOnLeaderboard']
-            ].map(([l,k])=>(
-              <div key={k} style={row}>
-                <div><div style={{fontSize:14,fontWeight:600}}>{l}</div></div>
-                <Toggle
-                  val={user?.privacy?.[k]??true}
-                  onToggle={()=>update({privacy:{...user?.privacy,[k]:!(user?.privacy?.[k]??true)}})}
-                />
-              </div>
-            ))}
-          </>}
-
-          {/* Danger Zone */}
-          {tab==='danger'&&<>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:6,color:'var(--rose)'}}>Danger Zone</div>
-            <div style={{fontSize:13,color:'var(--muted2)',marginBottom:28}}>Irreversible actions.</div>
-            <div style={row}>
-              <div>
-                <div style={{fontSize:14,fontWeight:600}}>Reset All Progress</div>
-                <div style={{fontSize:12,color:'var(--muted2)'}}>Clear XP, simulations, certificates</div>
-              </div>
-              <button onClick={()=>{
-                if(confirm('Reset all progress?')){
-                  update({xp:0,certs:[]});
-                  resetSims();
-                  showToast('Progress reset');
-                }
-              }} style={{padding:'10px 20px',background:'rgba(248,113,113,.1)',color:'var(--rose)',border:'1px solid rgba(248,113,113,.2)',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer'}}>
-                Reset Progress
+              <button style={s.saveBtn} onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
-            <div style={row}>
-              <div><div style={{fontSize:14,fontWeight:600}}>Sign Out</div></div>
-              <button onClick={logout} style={{padding:'10px 20px',background:'rgba(248,113,113,.1)',color:'var(--rose)',border:'1px solid rgba(248,113,113,.2)',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer'}}>
-                Sign Out
+          )}
+
+          {/* ── EDUCATION ── */}
+          {section === 'Education' && (
+            <div>
+              <h3 style={s.sectionTitle}>Education</h3>
+              <p style={s.sectionSub}>Your academic background</p>
+
+              <p style={s.label}>College / University</p>
+              <input style={s.inp} value={form.college} onChange={e => set('college', e.target.value)} placeholder="e.g. Pune University" />
+
+              <div style={s.grid2}>
+                <div>
+                  <p style={s.label}>Degree</p>
+                  <select style={s.sel} value={form.degree} onChange={e => set('degree', e.target.value)}>
+                    <option value="">Select...</option>
+                    {['B.Tech / B.E.','B.Sc','BCA','MCA','M.Tech','MBA','B.Com','Other'].map(d => (
+                      <option key={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <p style={s.label}>Branch / Stream</p>
+                  <input style={s.inp} value={form.branch} onChange={e => set('branch', e.target.value)} placeholder="e.g. Computer Science" />
+                </div>
+                <div>
+                  <p style={s.label}>Graduation Year</p>
+                  <input type="number" style={s.inp} value={form.gradyear} onChange={e => set('gradyear', e.target.value)} placeholder="e.g. 2025" min="1990" max="2035" />
+                </div>
+              </div>
+
+              <button style={s.saveBtn} onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Education'}
               </button>
             </div>
-          </>}
+          )}
+
+          {/* ── NOTIFICATIONS ── */}
+          {section === 'Notifications' && (
+            <div>
+              <h3 style={s.sectionTitle}>Notifications</h3>
+              <p style={s.sectionSub}>Choose what you want to be notified about</p>
+
+              {[
+                { key: 'email',   label: 'Email notifications',   sub: 'Receive updates and alerts via email' },
+                { key: 'browser', label: 'Browser notifications', sub: 'Push notifications in your browser' },
+                { key: 'weekly',  label: 'Weekly digest',         sub: 'A summary of your progress every week' },
+              ].map(item => (
+                <div key={item.key} style={s.toggleRow}>
+                  <div>
+                    <p style={s.toggleLabel}>{item.label}</p>
+                    <p style={s.toggleSub}>{item.sub}</p>
+                  </div>
+                  <div
+                    style={{ ...s.toggle, background: form.notifications[item.key] ? '#7C6EFA' : 'var(--border2)' }}
+                    onClick={() => setNot(item.key, !form.notifications[item.key])}
+                  >
+                    <div style={{ ...s.toggleKnob, transform: form.notifications[item.key] ? 'translateX(20px)' : 'translateX(0)' }} />
+                  </div>
+                </div>
+              ))}
+
+              <button style={s.saveBtn} onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Preferences'}
+              </button>
+            </div>
+          )}
+
+          {/* ── PRIVACY ── */}
+          {section === 'Privacy' && (
+            <div>
+              <h3 style={s.sectionTitle}>Privacy</h3>
+              <p style={s.sectionSub}>Control who can see your profile</p>
+
+              {[
+                { key: 'publicProfile',       label: 'Public profile',         sub: 'Anyone can view your SimWork profile' },
+                { key: 'showEducation',        label: 'Show education',         sub: 'Display your college and degree on profile' },
+                { key: 'showOnLeaderboard',    label: 'Show on leaderboard',    sub: 'Appear in the public XP rankings' },
+              ].map(item => (
+                <div key={item.key} style={s.toggleRow}>
+                  <div>
+                    <p style={s.toggleLabel}>{item.label}</p>
+                    <p style={s.toggleSub}>{item.sub}</p>
+                  </div>
+                  <div
+                    style={{ ...s.toggle, background: form.privacy[item.key] ? '#7C6EFA' : 'var(--border2)' }}
+                    onClick={() => setPri(item.key, !form.privacy[item.key])}
+                  >
+                    <div style={{ ...s.toggleKnob, transform: form.privacy[item.key] ? 'translateX(20px)' : 'translateX(0)' }} />
+                  </div>
+                </div>
+              ))}
+
+              <button style={s.saveBtn} onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Privacy'}
+              </button>
+            </div>
+          )}
+
+          {/* ── DANGER ZONE ── */}
+          {section === 'Danger Zone' && (
+            <div>
+              <h3 style={{ ...s.sectionTitle, color: '#F87171' }}>Danger Zone</h3>
+              <p style={s.sectionSub}>These actions are irreversible. Please be careful.</p>
+
+              <div style={s.dangerCard}>
+                <div>
+                  <p style={s.toggleLabel}>Sign out of all devices</p>
+                  <p style={s.toggleSub}>Invalidates your current session token</p>
+                </div>
+                <button style={s.dangerBtn} onClick={logout}>Sign Out</button>
+              </div>
+
+              <div style={{ ...s.dangerCard, marginTop: 12, borderColor: '#F87171' }}>
+                <div>
+                  <p style={{ ...s.toggleLabel, color: '#F87171' }}>Delete account</p>
+                  <p style={s.toggleSub}>Permanently delete your account and all data. Cannot be undone.</p>
+                </div>
+                <button
+                  style={{ ...s.dangerBtn, background: '#F87171' }}
+                  onClick={() => {
+                    if (window.confirm('Are you sure? This cannot be undone.')) {
+                      API.delete('/api/users/me').then(() => logout());
+                    }
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
     </div>
   );
 }
+
+const s = {
+  page:         { padding: '24px 28px', maxWidth: 900, margin: '0 auto' },
+  pageTitle:    { fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 24 },
+  layout:       { display: 'flex', gap: 24 },
+  sidebar:      { width: 180, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 },
+  navItem:      { padding: '10px 14px', borderRadius: 8, fontSize: 13, color: 'var(--muted2)', cursor: 'pointer', fontWeight: 500 },
+  navActive:    { background: 'var(--s2)', color: 'var(--text)', fontWeight: 700 },
+  panel:        { flex: 1, background: 'var(--s2)', borderRadius: 14, padding: 28, border: '1px solid var(--border2)' },
+  sectionTitle: { fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 },
+  sectionSub:   { fontSize: 13, color: 'var(--muted2)', marginBottom: 24 },
+  avatarRow:    { display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 },
+  avatar:       { width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#fff', flexShrink: 0 },
+  colorRow:     { display: 'flex', gap: 8, marginTop: 8 },
+  colorDot:     { width: 26, height: 26, borderRadius: '50%', cursor: 'pointer', transition: 'outline .15s' },
+  grid2:        { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 },
+  label:        { fontSize: 12, fontWeight: 600, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 },
+  inp:          { width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', outline: 'none' },
+  sel:          { width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border2)', background: 'var(--bg)', color: 'var(--text)', fontSize: 14, cursor: 'pointer' },
+  saveBtn:      { marginTop: 24, padding: '11px 28px', background: '#7C6EFA', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' },
+  toggleRow:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--border)' },
+  toggleLabel:  { fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 2 },
+  toggleSub:    { fontSize: 12, color: 'var(--muted2)' },
+  toggle:       { width: 44, height: 24, borderRadius: 12, cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 },
+  toggleKnob:   { position: 'absolute', top: 3, left: 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'transform .2s' },
+  dangerCard:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 10, border: '1px solid var(--border2)', background: 'var(--bg)' },
+  dangerBtn:    { padding: '8px 18px', background: 'var(--s2)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', fontWeight: 600, cursor: 'pointer', fontSize: 13, flexShrink: 0 },
+};

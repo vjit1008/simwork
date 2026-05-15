@@ -1,44 +1,104 @@
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSim }  from '../context/SimContext';
-import { LEADERBOARD_OTHERS } from '../data/simulations';
-import AILeaderboardInsights from '../components/AI/AILeaderboardInsights';
+import API from '../api/axios';
+import GeminiRankInsight from '../components/GeminiRankInsight';
 
 export default function Leaderboard() {
   const { user } = useAuth();
-  const { sims } = useSim();
-  const done = sims.filter(s=>s.status==='done').length;
-  const fullName = user ? `${user.name||''} ${user.lname||''}`.trim() : 'User';
-  const initials = user ? ((user.name||'?')[0]+((user.lname||'')[0]||'')).toUpperCase() : '?';
+  const [board, setBoard]   = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const all = [
-    { name:fullName, score:user?.xp||0, avatar:initials, color:user?.avatarColor||'#7C6EFA', sims:done, isMe:true },
-    ...LEADERBOARD_OTHERS
-  ].sort((a,b)=>b.score-a.score);
+  useEffect(() => {
+    API.get('/api/leaderboard')
+      .then(r => setBoard(r.data.leaderboard))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const me = board.find(u => u.name === user?.name);
+  const myRank = me?.rank || board.length + 1;
+  const topXP  = board[0]?.xp || 0;
+
+  const medal = (rank) => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `#${rank}`;
+  };
 
   return (
-    <div style={{padding:'28px 32px',overflowY:'auto',flex:1}}>
-      <div style={{marginBottom:24}}>
-        <h1 style={{fontSize:22,fontWeight:800,letterSpacing:'-.02em',marginBottom:6}}>🏆 Leaderboard</h1>
-        <p style={{fontSize:14,color:'var(--muted2)'}}>Top performers this month</p>
-      </div>
-      
-      <AILeaderboardInsights 
-        currentUser={user}
-        topUsers={all.slice(0, 5)}
-        userRank={all.findIndex(u => u.isMe) + 1}
-      />
-      
-      <div style={{background:'var(--s1)',border:'1px solid var(--border)',borderRadius:14,overflow:'hidden'}}>
-        {all.map((l,i)=>(
-          <div key={i} style={{display:'flex',alignItems:'center',gap:14,padding:'14px 20px',borderBottom:'1px solid var(--border)',background:l.isMe?'rgba(124,110,250,.06)':'transparent'}}>
-            <div style={{fontFamily:'var(--mono)',fontSize:14,fontWeight:700,width:36,color:'var(--muted)'}}>{i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</div>
-            <div style={{width:36,height:36,borderRadius:'50%',background:l.color+'22',color:l.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700}}>{l.avatar}</div>
-            <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?'var(--accent)':'var(--text)'}}>{l.name}{l.isMe?' (you)':''}</div>
-            <div style={{fontSize:12,color:'var(--muted)',width:80,textAlign:'right'}}>{l.sims} sim{l.sims!==1?'s':''}</div>
-            <div style={{fontFamily:'var(--mono)',fontSize:13,color:'var(--accent2)'}}>{l.score} XP</div>
+    <div style={s.page}>
+      <div style={s.header}>
+        <div>
+          <h2 style={s.title}>🏆 Leaderboard</h2>
+          <p style={s.sub}>Top performers this month</p>
+        </div>
+        {me && (
+          <div style={s.myRank}>
+            <span style={s.myRankNum}>{medal(myRank)}</span>
+            <span style={s.myRankLabel}>Your rank</span>
           </div>
-        ))}
+        )}
       </div>
+
+      {/* Gemini AI Insight */}
+      <GeminiRankInsight
+        userRank={myRank}
+        totalUsers={board.length}
+        userXP={user?.xp || 0}
+        topXP={topXP}
+      />
+
+      {loading ? (
+        <div style={s.empty}>Loading leaderboard...</div>
+      ) : board.length === 0 ? (
+        <div style={s.empty}>No users yet. Be the first to earn XP!</div>
+      ) : (
+        <div style={s.table}>
+          {board.map((u, i) => {
+            const isMe = u.name === user?.name;
+            return (
+              <div key={u.id} style={{ ...s.row, ...(isMe ? s.meRow : {}) }}>
+                <span style={s.rank}>{medal(u.rank)}</span>
+                <div style={{ ...s.dot, background: u.avatarColor }}>
+                  {u.avatar}
+                </div>
+                <div style={s.info}>
+                  <span style={s.name}>
+                    {u.name} {isMe && <span style={s.youTag}>(you)</span>}
+                  </span>
+                  <span style={s.role}>{u.role || 'SimWork User'}</span>
+                </div>
+                <div style={s.xpBlock}>
+                  <span style={s.xp}>{u.xp.toLocaleString()} XP</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
+
+const s = {
+  page:       { padding: '24px 28px', maxWidth: 800, margin: '0 auto' },
+  header:     { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  title:      { fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 4 },
+  sub:        { fontSize: 13, color: 'var(--muted2)' },
+  myRank:     { background: 'var(--s2)', borderRadius: 12, padding: '10px 20px', textAlign: 'center', border: '1px solid var(--border2)' },
+  myRankNum:  { display: 'block', fontSize: 24, fontWeight: 800, color: '#7C6EFA' },
+  myRankLabel:{ fontSize: 11, color: 'var(--muted2)', textTransform: 'uppercase', letterSpacing: '.05em' },
+  empty:      { textAlign: 'center', padding: 60, color: 'var(--muted2)', fontSize: 14 },
+  table:      { display: 'flex', flexDirection: 'column', gap: 8 },
+  row:        { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'var(--s2)', borderRadius: 12, border: '1px solid var(--border2)' },
+  meRow:      { border: '1px solid #7C6EFA', background: 'rgba(124,110,250,.08)' },
+  rank:       { width: 36, textAlign: 'center', fontSize: 18, fontWeight: 700, color: 'var(--text)', flexShrink: 0 },
+  dot:        { width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#fff', flexShrink: 0 },
+  info:       { flex: 1 },
+  name:       { display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 2 },
+  role:       { fontSize: 12, color: 'var(--muted2)' },
+  youTag:     { fontSize: 11, color: '#7C6EFA', fontWeight: 700 },
+  xpBlock:    { textAlign: 'right' },
+  xp:         { fontSize: 15, fontWeight: 700, color: '#34D399' },
+};

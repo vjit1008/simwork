@@ -17,8 +17,16 @@ const userSchema = new mongoose.Schema({
   avatarColor: { type: String, default: '#7C6EFA' },
   xp:          { type: Number, default: 0 },
   certs:       [{ type: mongoose.Schema.Types.Mixed }],
-  notifications: { type: mongoose.Schema.Types.Mixed, default: {} },
-  privacy:       { type: mongoose.Schema.Types.Mixed, default: {} },
+  notifications: {
+  email:   { type: Boolean, default: true },
+  browser: { type: Boolean, default: true },
+  weekly:  { type: Boolean, default: true },
+},
+privacy: {
+  publicProfile:       { type: Boolean, default: true },
+  showEducation:       { type: Boolean, default: true },
+  showOnLeaderboard:   { type: Boolean, default: true },
+},
 
   role: {
   type: String,

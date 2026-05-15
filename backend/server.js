@@ -11,6 +11,8 @@ const dotenv   = require('dotenv');
 const projectRoutes      = require('./routes/projectRoutes');
 const channelRoutes      = require('./routes/channelRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
+
 require('express-async-errors');
 
 dotenv.config();
@@ -54,7 +56,7 @@ app.use('/api/projects',      projectRoutes);
 app.use('/api/channels',      channelRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/user',          userRoutes);
-
+app.use('/api/leaderboard', leaderboardRoutes);
 app.get('/health', (req, res) => res.json({
   status: 'OK', timestamp: new Date(),
   db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
