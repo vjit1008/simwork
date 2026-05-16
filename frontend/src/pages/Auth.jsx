@@ -200,25 +200,7 @@ export default function Auth() {
                 <div style={{fontSize:14,color:'var(--muted2)',marginBottom:24}}>Sign in to continue your simulation journey</div>
                 <label style={s.label}>Email Address</label>
                 <input style={s.inp} type="email" placeholder="you@example.com" value={login.email} onChange={e=>setLogin({...login,email:e.target.value})} onKeyDown={e=>e.key==='Enter'&&handleLogin()}/>
-                <label style={s.label}>Password</label>
-                <input style={s.inp} type="password" placeholder="Your password" value={login.password} onChange={e=>setLogin({...login,password:e.target.value})} onKeyDown={e=>e.key==='Enter'&&handleLogin()}/>
-                {error && <div style={s.err}>{error}</div>}
-                <button style={s.btn} onClick={handleLogin}>Sign In →</button>
-                <button style={s.ghost} onClick={()=>{doLogin(DEMO);navigate('/');showToast('Demo account loaded! 🚀');}}>🚀 Try Demo Account</button>
-                <div style={{textAlign:'center',marginTop:20,fontSize:13,color:'var(--muted2)'}}>Don't have an account? <span style={{color:'var(--accent)',cursor:'pointer',fontWeight:600}} onClick={()=>setTab('signup')}>Sign Up</span></div>
-              </>
-            ) : (
-              <>
-                <div style={{fontSize:24,fontWeight:800,marginBottom:4}}>Create account ✨</div>
-                <div style={{fontSize:14,color:'var(--muted2)',marginBottom:16}}>Join thousands of freshers building job-ready skills</div>
-                <div style={s.sec}>Personal Info</div>
-                <div style={s.row}>
-                  <div><label style={s.label}>First Name *</label><input style={s.inp} placeholder="First" value={signup.name} onChange={e=>setSignup({...signup,name:e.target.value})}/></div>
-                  <div><label style={s.label}>Last Name *</label><input style={s.inp} placeholder="Last" value={signup.lname} onChange={e=>setSignup({...signup,lname:e.target.value})}/></div>
-                </div>
-                <label style={s.label}>Email *</label>
-                <input style={s.inp} type="email" placeholder="you@example.com" value={signup.email} onChange={e=>setSignup({...signup,email:e.target.value})}/>
-                <label style={s.label}>Password</label>
+               <label style={s.label}>Password</label>
 <input style={s.inp} type="password" placeholder="Your password" value={login.password} onChange={e=>setLogin({...login,password:e.target.value})} onKeyDown={e=>e.key==='Enter'&&handleLogin()}/>
 
 {/* ✅ Forgot password link */}
@@ -233,6 +215,22 @@ export default function Auth() {
 
 {error && <div style={s.err}>{error}</div>}
 <button style={s.btn} onClick={handleLogin}>Sign In →</button>
+                <button style={s.ghost} onClick={()=>{doLogin(DEMO);navigate('/');showToast('Demo account loaded! 🚀');}}>🚀 Try Demo Account</button>
+                <div style={{textAlign:'center',marginTop:20,fontSize:13,color:'var(--muted2)'}}>Don't have an account? <span style={{color:'var(--accent)',cursor:'pointer',fontWeight:600}} onClick={()=>setTab('signup')}>Sign Up</span></div>
+              </>
+            ) : (
+              <>
+                <div style={{fontSize:24,fontWeight:800,marginBottom:4}}>Create account ✨</div>
+                <div style={{fontSize:14,color:'var(--muted2)',marginBottom:16}}>Join thousands of freshers building job-ready skills</div>
+                <div style={s.sec}>Personal Info</div>
+                <div style={s.row}>
+                  <div><label style={s.label}>First Name *</label><input style={s.inp} placeholder="First" value={signup.name} onChange={e=>setSignup({...signup,name:e.target.value})}/></div>
+                  <div><label style={s.label}>Last Name *</label><input style={s.inp} placeholder="Last" value={signup.lname} onChange={e=>setSignup({...signup,lname:e.target.value})}/></div>
+                </div>
+                <label style={s.label}>Email *</label>
+                <input style={s.inp} type="email" placeholder="you@example.com" value={signup.email} onChange={e=>setSignup({...signup,email:e.target.value})}/>
+                <label style={s.label}>Password *</label>
+                <input style={s.inp} type="password" placeholder="Min. 6 characters" value={signup.password} onChange={e=>setSignup({...signup,password:e.target.value})}/>
                 <div style={s.row}>
                   <div><label style={s.label}>City</label><input style={s.inp} placeholder="Pune" value={signup.city} onChange={e=>setSignup({...signup,city:e.target.value})}/></div>
                   <div><label style={s.label}>Target Role</label>
