@@ -28,9 +28,7 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
-    <Link to="/forgot-password" style={{ color: '#7C6EFA', fontSize: 13, textDecoration: 'none' }}>
-  Forgot password?
-</Link>
+    // ❌ REMOVED the misplaced <Link> that was here
   };
 
   return (
@@ -67,6 +65,14 @@ const Login = () => {
               required
             />
           </div>
+
+          {/* ✅ Forgot password link — correctly placed INSIDE the form, ABOVE the button */}
+          <div style={{ textAlign: 'right', marginBottom: '0.75rem', marginTop: '-0.5rem' }}>
+            <Link to="/forgot-password" style={{ color: '#7C6EFA', fontSize: '0.82rem', textDecoration: 'none' }}>
+              Forgot password?
+            </Link>
+          </div>
+
           <button type="submit" style={styles.btn} disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}
           </button>
