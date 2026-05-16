@@ -16,10 +16,10 @@ API.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('simwork_user_v3');
-      window.location.href = '/login';
+      // ✅ Use replace so back button doesn't loop
+      window.location.replace('/auth');
     }
     return Promise.reject(err);
   }
 );
-
 export default API;
