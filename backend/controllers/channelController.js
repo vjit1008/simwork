@@ -25,25 +25,23 @@ const getChannel = async (req, res) => {
   }
 };
 
-// POST create channel — adds ALL existing users as members
 const createChannel = async (req, res) => {
   try {
     const { name, projectId, department } = req.body;
+
     if (!name?.trim()) {
       return res.status(400).json({ success: false, message: 'Channel name required.' });
     }
 
     // Prevent duplicate
-    const existing = await Channel.findOne({
-      name: name.trim().toLowerCase(),
-    });
+    const existing = await Channel.findOne({ name: name.trim().toLowerCase() });
     if (existing) {
       return res.status(400).json({ success: false, message: 'Channel already exists.' });
     }
 
-    // Get ALL user IDs
-    const allUsers = await User.find({}).select('_id');
-    const memberIds = allUsers.map(u => u._id);
+    // ✅ Safe way to get all user IDs
+    const allUsers = await User.find({}).select('_id').lean();
+    const memberIds = Array.isArray(allUsers) ? allUsers.map(u => u._id) : [];
 
     const channel = await Channel.create({
       name:       name.trim().toLowerCase(),
@@ -54,7 +52,7 @@ const createChannel = async (req, res) => {
 
     res.status(201).json({ success: true, channel });
   } catch (err) {
-    console.error('❌ createChannel error:', err);
+    console.error('❌ createChannel error:', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };

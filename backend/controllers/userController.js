@@ -33,4 +33,5 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// ✅ CRITICAL — must export both functions
 module.exports = { getProfile, updateProfile };

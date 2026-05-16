@@ -1,10 +1,10 @@
 const express = require('express');
-const { protect } = require('../middleware/authMiddleware');
-const { getMe, updateMe } = require('../controllers/userController');
-
 const router = express.Router();
+const { protect } = require('../middleware/authMiddleware');
+const { getProfile, updateProfile } = require('../controllers/userController');
 
-router.get('/me',  protect, getMe);
-router.put('/me',  protect, updateMe);
+// ✅ Check these function names match exactly what's exported above
+router.get('/me',  protect, getProfile);
+router.put('/me',  protect, updateProfile);
 
 module.exports = router;
