@@ -5,11 +5,6 @@
  * https://simwork.vercel.app
  */
 process.on('uncaughtException', (err) => {
-  console.error('❌ UNCAUGHT:', err.message);
-  console.error(err.stack);
-  process.exit(1);
-});
-process.on('uncaughtException', (err) => {
   console.error('❌ UNCAUGHT EXCEPTION:', err.message);
   console.error(err.stack);
   process.exit(1);
