@@ -58,9 +58,11 @@ function AppLayout() {
  if (!isAuthenticated) {
   return (
     <Routes>
-      <Route path="/"     element={<Landing />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="*"     element={<Navigate to="/" replace />} />
+      <Route path="/"                          element={<Landing />} />
+      <Route path="/auth"                      element={<Auth />} />
+      <Route path="/forgot-password"           element={<ForgotPassword />} />
+      <Route path="/reset-password/:token"     element={<ResetPassword />} />
+      <Route path="*"                          element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
