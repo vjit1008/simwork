@@ -1,19 +1,23 @@
 /**
  * SimWork — Simulate Before You Apply
  * Copyright (c) 2025 Vishvajit Gadakari. All rights reserved.
- * Unauthorized copying, modification, or distribution is prohibited.
- * https://simwork.vercel.app
  */
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', err.message);
+  console.error(err.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ UNHANDLED REJECTION:', reason);
+  process.exit(1);
+});
 
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
 const dotenv   = require('dotenv');
-const projectRoutes      = require('./routes/projectRoutes');
-const channelRoutes      = require('./routes/channelRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const leaderboardRoutes = require('./routes/leaderboardRoutes');
-
 require('express-async-errors');
 
 dotenv.config();
@@ -25,18 +29,27 @@ console.log('🔧 ENV check:', {
   PORT:       process.env.PORT       || 5000,
 });
 
-const authRoutes      = require('./routes/authRoutes');
-const interviewRoutes = require('./routes/interviewRoutes');
-const userRoutes      = require('./routes/userRoutes');
-const { errorHandler } = require('./middleware/errorMiddleware');
+// ── Load routes ───────────────────────────────────────────────
+const authRoutes          = require('./routes/authRoutes');
+const interviewRoutes     = require('./routes/interviewRoutes');
+const projectRoutes       = require('./routes/projectRoutes');
+const channelRoutes       = require('./routes/channelRoutes');
+const notificationRoutes  = require('./routes/notificationRoutes');
+const userRoutes          = require('./routes/userRoutes');
+const leaderboardRoutes   = require('./routes/leaderboardRoutes');
+const { errorHandler }    = require('./middleware/errorMiddleware');
 
 const app = express();
 
-// ✅ FIX 3 — include your deployed Vercel frontend URL via env var
+// ── CORS ──────────────────────────────────────────────────────
 const allowedOrigins = [
-  'http://localhost:5173','http://localhost:5174','http://localhost:5175',
-  'http://localhost:5176','http://localhost:5177','http://localhost:3000',
-  process.env.CLIENT_URL,       // e.g. https://simwork.vercel.app
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:5176',
+  'http://localhost:5177',
+  'http://localhost:3000',
+  process.env.CLIENT_URL,
 ].filter(Boolean);
 
 app.use(cors({
@@ -51,50 +64,44 @@ app.use(cors({
 
 app.use(express.json());
 
+// ── Routes ────────────────────────────────────────────────────
 app.use('/api/auth',          authRoutes);
 app.use('/api/interview',     interviewRoutes);
 app.use('/api/projects',      projectRoutes);
 app.use('/api/channels',      channelRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/user',          userRoutes);
-app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/users',         userRoutes);
+app.use('/api/leaderboard',   leaderboardRoutes);
+
 app.get('/health', (req, res) => res.json({
-  status: 'OK', timestamp: new Date(),
+  status: 'OK',
+  timestamp: new Date(),
   db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
 }));
+
 app.get('/ping', (req, res) => res.json({ ok: true, time: new Date() }));
+
 app.use(errorHandler);
 
-// ✅ FIX 2 — cache the connection across serverless invocations
-let isConnected = false;
-
-async function connectDB() {
-  if (isConnected) return;
+// ── Start server — always, on both local and Render ───────────
+if (process.env.NODE_ENV !== 'test') {
   if (!process.env.MONGO_URI) {
-    // ✅ FIX 1 — throw instead of process.exit() so Vercel can return a 500
-    throw new Error('MONGO_URI is not defined in environment variables');
+    console.error('❌ MONGO_URI is not defined — cannot start.');
+    process.exit(1);
   }
-  await mongoose.connect(process.env.MONGO_URI);
-  isConnected = true;
-  console.log('✅ MongoDB connected to:', mongoose.connection.host);
-  console.log('✅ DB name:', mongoose.connection.name);
-}
 
-// Local dev only — Vercel ignores app.listen() and uses module.exports
-if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 5000;
-  connectDB()
-    .then(() => app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`)))
+
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => {
+      console.log('✅ MongoDB connected to:', mongoose.connection.host);
+      console.log('✅ DB name:', mongoose.connection.name);
+      app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    })
     .catch((err) => {
-      console.error('❌ Startup failed:', err.message);
-      process.exit(1); // safe here — only runs locally, not on Vercel
+      console.error('❌ MongoDB connection failed:', err.message);
+      process.exit(1);
     });
 }
 
-// ✅ Wrap app to ensure DB is connected before handling any request on Vercel
-const serverlessApp = async (req, res) => {
-  await connectDB();
-  return app(req, res);
-};
-
-module.exports = serverlessApp;
+module.exports = app;
