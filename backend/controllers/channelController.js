@@ -1,8 +1,9 @@
 const Channel = require('../models/Channel');
+const User = require('../models/User');
 
+// GET all channels — every user sees every channel
 const getChannels = async (req, res) => {
   try {
-    // ✅ ALL users see ALL channels — no filte
     const channels = await Channel.find()
       .select('-messages')
       .sort({ createdAt: 1 });
@@ -12,7 +13,8 @@ const getChannels = async (req, res) => {
   }
 };
 
-/**const getChannel = async (req, res) => {
+// GET single channel with messages
+const getChannel = async (req, res) => {
   try {
     const channel = await Channel.findById(req.params.id)
       .populate('messages.sender', 'name');
@@ -21,73 +23,68 @@ const getChannels = async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
-};**/
-
-const createChannel = async (req, res) => {
-  try {
-    const { name, projectId, department } = req.body;
-
-    // ✅ Get all users to add to channel by default
-    const User = require('../models/User');
-    const allUsers = await User.find().select('_id');
-    const allUserIds = allUsers.map(u => u._id);
-
-    const channel = await Channel.create({
-      name,
-      projectId: projectId || null,
-      department: department || 'general',
-      members: allUserIds, // ✅ everyone is a member
-    });
-
-    res.status(201).json({ success: true, channel });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
 };
+
+// POST create channel — adds ALL existing users as members
 const createChannel = async (req, res) => {
   try {
     const { name, projectId, department } = req.body;
-    if (!name?.trim()) return res.status(400).json({ success: false, message: 'Channel name required.' });
+    if (!name?.trim()) {
+      return res.status(400).json({ success: false, message: 'Channel name required.' });
+    }
 
-    // ✅ Prevent duplicate channel names
-    const existing = await Channel.findOne({ name: name.trim().toLowerCase() });
-    if (existing) return res.status(400).json({ success: false, message: 'Channel already exists.' });
-
-    const User = require('../models/User');
-    const allUsers = await User.find().select('_id');
-
-    const channel = await Channel.create({
+    // Prevent duplicate
+    const existing = await Channel.findOne({
       name: name.trim().toLowerCase(),
-      projectId: projectId || null,
+    });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Channel already exists.' });
+    }
+
+    // Get ALL user IDs
+    const allUsers = await User.find({}).select('_id');
+    const memberIds = allUsers.map(u => u._id);
+
+    const channel = await Channel.create({
+      name:       name.trim().toLowerCase(),
+      projectId:  projectId  || null,
       department: department || 'general',
-      members: allUsers.map(u => u._id),
+      members:    memberIds,
     });
 
     res.status(201).json({ success: true, channel });
   } catch (err) {
+    console.error('❌ createChannel error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// POST send message
 const postMessage = async (req, res) => {
   try {
     const { text } = req.body;
-    const channel = await Channel.findById(req.params.id);
-    if (!channel) return res.status(404).json({ success: false, message: 'Not found.' });
-
-    // ✅ Auto-join channel when posting
-    if (!channel.members.includes(req.user._id)) {
-      channel.members.push(req.user._id);
+    if (!text?.trim()) {
+      return res.status(400).json({ success: false, message: 'Message cannot be empty.' });
     }
 
-    const msg = {
+    const channel = await Channel.findById(req.params.id);
+    if (!channel) return res.status(404).json({ success: false, message: 'Channel not found.' });
+
+    // Auto-join if not already a member
+    const isMember = channel.members.some(
+      m => m.toString() === req.user._id.toString()
+    );
+    if (!isMember) channel.members.push(req.user._id);
+
+    channel.messages.push({
       sender:     req.user._id,
       senderName: req.user.name,
-      text,
-    };
-    channel.messages.push(msg);
-    await channel.save();
+      text:       text.trim(),
+      createdAt:  new Date(),
+    });
 
-    res.status(201).json({ success: true, message: msg });
+    await channel.save();
+    res.status(201).json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
