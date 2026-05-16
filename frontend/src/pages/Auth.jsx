@@ -218,8 +218,21 @@ export default function Auth() {
                 </div>
                 <label style={s.label}>Email *</label>
                 <input style={s.inp} type="email" placeholder="you@example.com" value={signup.email} onChange={e=>setSignup({...signup,email:e.target.value})}/>
-                <label style={s.label}>Password *</label>
-                <input style={s.inp} type="password" placeholder="Min. 6 characters" value={signup.password} onChange={e=>setSignup({...signup,password:e.target.value})}/>
+                <label style={s.label}>Password</label>
+<input style={s.inp} type="password" placeholder="Your password" value={login.password} onChange={e=>setLogin({...login,password:e.target.value})} onKeyDown={e=>e.key==='Enter'&&handleLogin()}/>
+
+{/* ✅ Forgot password link */}
+<div style={{textAlign:'right',marginTop:6,marginBottom:2}}>
+  <span
+    style={{fontSize:12,color:'var(--accent)',cursor:'pointer',fontWeight:600}}
+    onClick={()=>navigate('/forgot-password')}
+  >
+    Forgot password?
+  </span>
+</div>
+
+{error && <div style={s.err}>{error}</div>}
+<button style={s.btn} onClick={handleLogin}>Sign In →</button>
                 <div style={s.row}>
                   <div><label style={s.label}>City</label><input style={s.inp} placeholder="Pune" value={signup.city} onChange={e=>setSignup({...signup,city:e.target.value})}/></div>
                   <div><label style={s.label}>Target Role</label>
