@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema({
   email:   { type: Boolean, default: true },
   browser: { type: Boolean, default: true },
   weekly:  { type: Boolean, default: true },
+  resetPasswordToken:  { type: String },
+resetPasswordExpire: { type: Date },
 },
 privacy: {
   publicProfile:       { type: Boolean, default: true },

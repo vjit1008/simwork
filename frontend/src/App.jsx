@@ -16,7 +16,8 @@ import IDEPage     from './components/IDE/IDEPage';
 import './styles/global.css';
 import Projects  from './pages/Projects';
 import Teamwork  from './pages/Teamwork';
-
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword  from './pages/ResetPassword';
 
 const BREADCRUMBS = {
   '/':            'Dashboard',
@@ -106,6 +107,8 @@ function AppLayout() {
             <Route path="/settings"    element={<Settings />} />
             <Route path="/ide"         element={<IDEPage />} />
             <Route path="*"            element={<Navigate to="/" replace />} />
+            <Route path="/forgot-password"        element={<ForgotPassword />} />
+            <Route path="/reset-password/:token"  element={<ResetPassword />} />
           </Routes>
         </div>
       </div>

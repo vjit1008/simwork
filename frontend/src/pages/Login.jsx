@@ -28,6 +28,9 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+    <Link to="/forgot-password" style={{ color: '#7C6EFA', fontSize: 13, textDecoration: 'none' }}>
+  Forgot password?
+</Link>
   };
 
   return (
