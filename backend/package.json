@@ -11,30 +11,30 @@
     "test:coverage": "jest --coverage --forceExit --verbose"
   },
   "jest": {
-  "testEnvironment": "node",
-  "testMatch": ["**/__tests__/**/*.test.js"],
-  "testTimeout": 30000,
-  "forceExit": true
-},
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.js"],
+    "testTimeout": 30000,
+    "forceExit": true
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-  "bcryptjs": "^3.0.3",
-  "cors": "^2.8.6",
-  "dotenv": "^17.4.2",
-  "express": "^4.22.1",
-  "express-async-errors": "^3.1.1",
-  "jsonwebtoken": "^9.0.3",
-  "mongoose": "^9.6.1",
-  "openai": "^6.35.0"
-},
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.1",
+    "express-async-errors": "^3.1.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.6.1",
+    "openai": "^6.35.0"
+  },
   "devDependencies": {
     "jest": "^29.0.0",
     "nodemon": "^3.0.0",
     "supertest": "^6.3.0"
   },
   "engines": {
-  "node": ">=20.0.0"
-}
+    "node": ">=20.0.0"
+  }
 }
