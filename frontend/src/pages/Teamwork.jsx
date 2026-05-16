@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { fetchChannels, fetchChannel, postMessage, createChannel } from '../api/projects';
 import { useAuth } from '../context/AuthContext';
-
+import EmojiPicker from "./EmojiPicker"; 
 export default function Teamwork() {
   const { user } = useAuth();
   const [channels, setChannels]   = useState([]);
@@ -180,6 +180,7 @@ export default function Teamwork() {
 
             {/* Input */}
             <div style={s.inputRow}>
+              <EmojiPicker onEmojiSelect={(emoji) => setText(prev => prev + emoji)} />
               <input
                 style={s.input}
                 placeholder={`Message #${active.name}`}
@@ -220,7 +221,7 @@ const s = {
   msgName:     { fontSize: 12, fontWeight: 700 },
   msgTime:     { fontSize: 11, color: 'var(--muted2)' },
   bubble:      { maxWidth: '70%', padding: '8px 14px', fontSize: 14, lineHeight: 1.5, wordBreak: 'break-word' },
-  inputRow:    { padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10 },
+  inputRow:    { padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'center'  },
   input:       { flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border2)', background: 'var(--s2)', color: 'var(--text)', fontSize: 14, outline: 'none' },
   sendBtn:     { padding: '10px 22px', background: '#7C6EFA', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 14 },
   empty:       { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted2)', fontSize: 15 },
