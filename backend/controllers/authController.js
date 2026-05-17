@@ -1,7 +1,6 @@
 const jwt      = require('jsonwebtoken');
 const crypto   = require('crypto');
 const bcrypt   = require('bcryptjs');
-const nodemailer = require('nodemailer');
 const User     = require('../models/User'); // ✅ only once
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -113,13 +112,24 @@ const forgotPassword = async (req, res) => {
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+await resend.emails.send({
+  from:    'SimWork <onboarding@resend.dev>',
+  to:      user.email,
+  subject: 'Reset your SimWork password',
+  html: `
+    <div style="font-family:sans-serif;max-width:480px;margin:auto">
+      <h2 style="color:#7C6EFA">Reset your password</h2>
+      <p>Click the button below to reset your password. This link expires in <b>30 minutes</b>.</p>
+      <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#7C6EFA;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">
+        Reset Password
+      </a>
+      <p style="color:#888;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
+    </div>
+  `,
+});
 
     await transporter.sendMail({
       from:    `"SimWork" <${process.env.EMAIL_USER}>`,
