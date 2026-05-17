@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import API from '../api/axios';
 
 export default function ResetPassword() {
   const { token }               = useParams();
@@ -16,7 +16,7 @@ export default function ResetPassword() {
     if (password.length < 6)  return setMessage('Password must be at least 6 characters.');
     setStatus('loading');
     try {
-      const res = await axios.post(`/api/auth/reset-password/${token}`, { password });
+      const res = await API.post(`/api/auth/reset-password/${token}`, { password });
       setMessage(res.data.message);
       setStatus('done');
       setTimeout(() => navigate('/login'), 2500);
