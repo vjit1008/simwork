@@ -4,15 +4,16 @@ import API from '../api/axios';
 
 export default function ForgotPassword() {
   const [email,   setEmail]   = useState('');
-  const [status,  setStatus]  = useState('idle'); // idle | loading | done | error
+  const [status,  setStatus]  = useState('idle');
   const [message, setMessage] = useState('');
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!email.trim()) {
-    setMessage('Please enter your email address.');
-    setStatus('error');
-    return;
+    e.preventDefault();
+    if (!email.trim()) {
+      setMessage('Please enter your email address.');
+      setStatus('error');
+      return;
+    }
     setStatus('loading');
     try {
       const res = await API.post('/api/auth/forgot-password', { email });
@@ -35,7 +36,7 @@ export default function ForgotPassword() {
           <div style={s.success}>
             ✅ {message}
             <br /><br />
-            <Link to="/login" style={s.link}>Back to Login</Link>
+            <Link to="/auth" style={s.link}>Back to Login</Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={s.form}>
@@ -51,7 +52,7 @@ export default function ForgotPassword() {
             <button type="submit" disabled={status === 'loading'} style={s.btn}>
               {status === 'loading' ? 'Sending…' : 'Send Reset Link'}
             </button>
-            <Link to="/login" style={s.link}>← Back to Login</Link>
+            <Link to="/auth" style={s.link}>← Back to Login</Link>
           </form>
         )}
       </div>
@@ -60,15 +61,15 @@ export default function ForgotPassword() {
 }
 
 const s = {
-  page:    { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' },
-  card:    { width: 380, padding: '40px 36px', background: 'var(--s1)', borderRadius: 16, border: '1px solid var(--border)', textAlign: 'center' },
-  logo:    { fontSize: 40, marginBottom: 12 },
-  title:   { fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px' },
-  sub:     { fontSize: 14, color: 'var(--muted2)', margin: '0 0 24px' },
-  form:    { display: 'flex', flexDirection: 'column', gap: 12 },
-  input:   { padding: '11px 14px', borderRadius: 9, border: '1px solid var(--border2)', background: 'var(--s2)', color: 'var(--text)', fontSize: 14, outline: 'none' },
-  btn:     { padding: '12px', background: '#7C6EFA', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 14 },
-  link:    { color: '#7C6EFA', fontSize: 13, textDecoration: 'none', marginTop: 4 },
-  err:     { color: '#F87171', fontSize: 13 },
-  success: { color: 'var(--text)', fontSize: 14, lineHeight: 1.6 },
+  page:    { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' },
+  card:    { width:380, padding:'40px 36px', background:'var(--s1)', borderRadius:16, border:'1px solid var(--border)', textAlign:'center' },
+  logo:    { fontSize:40, marginBottom:12 },
+  title:   { fontSize:22, fontWeight:700, color:'var(--text)', margin:'0 0 8px' },
+  sub:     { fontSize:14, color:'var(--muted2)', margin:'0 0 24px' },
+  form:    { display:'flex', flexDirection:'column', gap:12 },
+  input:   { padding:'11px 14px', borderRadius:9, border:'1px solid var(--border2)', background:'var(--s2)', color:'var(--text)', fontSize:14, outline:'none' },
+  btn:     { padding:'12px', background:'#7C6EFA', color:'#fff', border:'none', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:14 },
+  link:    { color:'#7C6EFA', fontSize:13, textDecoration:'none', marginTop:4 },
+  err:     { color:'#F87171', fontSize:13 },
+  success: { color:'var(--text)', fontSize:14, lineHeight:1.6 },
 };
