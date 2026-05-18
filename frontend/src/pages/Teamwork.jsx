@@ -38,6 +38,7 @@ export default function Teamwork() {
   const [reactionMsgId, setReactionMsgId] = useState(null);
   const [mentionList,   setMentionList]   = useState([]);
   const [showMentions,  setShowMentions]  = useState(false);
+  const [activeMenu,    setActiveMenu]    = useState(null); // msgId of open context menu
 
   /* ── refs ── */
   const bottomRef      = useRef();
@@ -47,6 +48,13 @@ export default function Teamwork() {
   const inputRef       = useRef(null);
 
   useEffect(() => { activeRef.current = active; }, [active]);
+
+  /* close context menu on outside click */
+  useEffect(() => {
+    const handler = () => setActiveMenu(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
 
   /* ════ helpers ════ */
   const lastRead    = (id) => parseInt(localStorage.getItem(`lr_${id}`) || '0');
@@ -215,10 +223,17 @@ export default function Teamwork() {
           0%,80%,100% { transform:scale(0.6); opacity:.4 }
           40%          { transform:scale(1);   opacity:1   }
         }
+        @keyframes menu-pop {
+          0%   { opacity:0; transform:scale(0.92) translateY(4px); }
+          100% { opacity:1; transform:scale(1)   translateY(0);    }
+        }
         .mention-item:hover { background: rgba(124,110,250,.12); }
         .action-btn:hover   { background: rgba(255,255,255,.08); }
         .ch-item:hover      { background: rgba(124,110,250,.08) !important; }
         .reaction-chip:hover{ background: rgba(124,110,250,.25) !important; }
+        .msg-bubble-wrap:hover .bubble-hover-hint { opacity: 1 !important; }
+        .ctx-menu-btn:hover { background: rgba(124,110,250,.12) !important; }
+        .ctx-menu-btn.danger:hover { background: rgba(248,113,113,.15) !important; color: #F87171 !important; }
       `}</style>
 
       <div style={s.container}>
@@ -295,6 +310,7 @@ export default function Teamwork() {
                 const isEditing = editingId === m._id;
                 const isHov     = hovered === i;
                 const showRxns  = reactionMsgId === m._id;
+                const menuOpen  = activeMenu === m._id;
 
                 return (
                   <div key={m._id || i}>
@@ -309,6 +325,7 @@ export default function Teamwork() {
                     )}
 
                     <div
+                      className="msg-bubble-wrap"
                       style={{ ...s.msg, alignItems: isMe ? 'flex-end' : 'flex-start', position:'relative' }}
                       onMouseEnter={() => setHovered(i)}
                       onMouseLeave={() => { setHovered(null); if (reactionMsgId === m._id) setReactionMsgId(null); }}
@@ -361,15 +378,81 @@ export default function Teamwork() {
                           <button onClick={() => setEditingId(null)} style={{ ...s.sendBtn, background:'var(--s2)', color:'var(--muted2)' }}>✕</button>
                         </div>
                       ) : (
-                        <div style={{
-                          ...s.bubble,
-                          background: m.deleted ? 'transparent' : isMe ? '#7C6EFA' : 'var(--s2)',
-                          color:      m.deleted ? 'var(--muted2)' : isMe ? '#fff' : 'var(--text)',
-                          fontStyle:  m.deleted ? 'italic' : 'normal',
-                          border:     m.deleted ? '1px dashed var(--border)' : 'none',
-                          borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                        }}>
-                          {m.text}
+                        <div style={{ position:'relative', display:'inline-block', maxWidth:'70%' }}>
+                          {/* Clickable bubble */}
+                          <div
+                            onClick={e => {
+                              if (m.deleted) return;
+                              e.stopPropagation();
+                              setActiveMenu(menuOpen ? null : m._id);
+                              setReactionMsgId(null);
+                            }}
+                            style={{
+                              ...s.bubble,
+                              maxWidth:'100%',
+                              background: m.deleted ? 'transparent' : isMe ? '#7C6EFA' : 'var(--s2)',
+                              color:      m.deleted ? 'var(--muted2)' : isMe ? '#fff' : 'var(--text)',
+                              fontStyle:  m.deleted ? 'italic' : 'normal',
+                              border:     m.deleted ? '1px dashed var(--border)' : menuOpen ? `1px solid rgba(124,110,250,.5)` : '1px solid transparent',
+                              borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                              cursor: m.deleted ? 'default' : 'pointer',
+                              transition: 'border-color .15s, box-shadow .15s',
+                              boxShadow: menuOpen ? '0 0 0 3px rgba(124,110,250,.12)' : 'none',
+                            }}>
+                            {m.text}
+                          </div>
+
+                          {/* Hover hint dot */}
+                          {!m.deleted && (
+                            <span className="bubble-hover-hint" style={{
+                              position:'absolute', top:'50%', transform:'translateY(-50%)',
+                              [isMe ? 'left' : 'right']: -18,
+                              fontSize:10, color:'var(--muted2)', opacity:0, transition:'opacity .15s',
+                              pointerEvents:'none', userSelect:'none',
+                            }}>•••</span>
+                          )}
+
+                          {/* Context menu */}
+                          {menuOpen && !m.deleted && (
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              style={{
+                                ...s.ctxMenu,
+                                [isMe ? 'right' : 'left']: 0,
+                                top: '100%',
+                                marginTop: 6,
+                              }}>
+                              {/* Quick reactions */}
+                              <div style={s.ctxReactions}>
+                                {QUICK_REACTIONS.map(emoji => (
+                                  <button key={emoji} style={s.ctxEmoji}
+                                    onClick={() => { handleReaction(m._id, emoji); setActiveMenu(null); }}>
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                              <div style={s.ctxDivider} />
+
+                              {/* Reply */}
+                              <button className="ctx-menu-btn" style={s.ctxBtn}
+                                onClick={() => { setReplyTo(m); setActiveMenu(null); }}>
+                                <span>↩</span> Reply
+                              </button>
+
+                              {/* Edit & Delete — only for own messages */}
+                              {isMe && (<>
+                                <button className="ctx-menu-btn" style={s.ctxBtn}
+                                  onClick={() => { setEditingId(m._id); setEditText(m.text); setActiveMenu(null); }}>
+                                  <span>✏️</span> Edit message
+                                </button>
+                                <div style={s.ctxDivider} />
+                                <button className="ctx-menu-btn danger" style={{ ...s.ctxBtn, color:'#F87171' }}
+                                  onClick={() => { setActiveMenu(null); handleDelete(m._id); }}>
+                                  <span>🗑️</span> Delete message
+                                </button>
+                              </>)}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -386,32 +469,6 @@ export default function Teamwork() {
                         </div>
                       )}
 
-                      {/* Hover action bar */}
-                      {isHov && !isEditing && !m.deleted && (
-                        <div style={{ ...s.actionBar, [isMe ? 'left' : 'right']: 0 }}>
-                          {showRxns ? (
-                            <>
-                              {QUICK_REACTIONS.map(emoji => (
-                                <button key={emoji} className="action-btn" style={s.actionBtn}
-                                  onClick={() => handleReaction(m._id, emoji)}>{emoji}</button>
-                              ))}
-                              <button className="action-btn" style={s.actionBtn}
-                                onClick={() => setReactionMsgId(null)}>✕</button>
-                            </>
-                          ) : (
-                            <button className="action-btn" style={s.actionBtn} title="React"
-                              onClick={() => setReactionMsgId(m._id)}>😊</button>
-                          )}
-                          <button className="action-btn" style={s.actionBtn} title="Reply"
-                            onClick={() => setReplyTo(m)}>↩</button>
-                          {isMe && (<>
-                            <button className="action-btn" style={s.actionBtn} title="Edit"
-                              onClick={() => { setEditingId(m._id); setEditText(m.text); }}>✏️</button>
-                            <button className="action-btn" style={s.actionBtn} title="Delete"
-                              onClick={() => handleDelete(m._id)}>🗑️</button>
-                          </>)}
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -527,6 +584,11 @@ const s = {
   dateLabel:       {},
   actionBar:       { position:'absolute', top:-36, display:'flex', gap:2, background:'var(--s1)', border:'1px solid var(--border)', borderRadius:8, padding:'3px 5px', zIndex:10, boxShadow:'0 2px 10px rgba(0,0,0,.3)' },
   actionBtn:       { background:'none', border:'none', cursor:'pointer', fontSize:15, padding:'2px 5px', borderRadius:4, lineHeight:1 },
+  ctxMenu:         { position:'absolute', zIndex:50, background:'var(--s1)', border:'1px solid var(--border)', borderRadius:12, minWidth:200, boxShadow:'0 8px 32px rgba(0,0,0,.4)', animation:'menu-pop .15s ease-out', overflow:'hidden' },
+  ctxReactions:    { display:'flex', gap:2, padding:'8px 10px 6px' },
+  ctxEmoji:        { background:'none', border:'none', cursor:'pointer', fontSize:20, padding:'4px', borderRadius:8, transition:'transform .1s', lineHeight:1 },
+  ctxDivider:      { height:1, background:'var(--border)', margin:'2px 0' },
+  ctxBtn:          { display:'flex', alignItems:'center', gap:10, width:'100%', background:'none', border:'none', cursor:'pointer', padding:'9px 14px', fontSize:13, color:'var(--text)', textAlign:'left', transition:'background .1s' },
   reactionChip:    { background:'rgba(124,110,250,.1)', border:'1px solid rgba(124,110,250,.2)', borderRadius:12, padding:'2px 8px', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', gap:4 },
   mentionDropdown: { position:'absolute', bottom:'100%', left:52, background:'var(--s1)', border:'1px solid var(--border)', borderRadius:10, overflow:'hidden', zIndex:100, minWidth:180, boxShadow:'0 4px 16px rgba(0,0,0,.3)' },
   mentionItem:     { display:'flex', alignItems:'center', gap:8, padding:'8px 12px', cursor:'pointer', fontSize:13, color:'var(--text)', transition:'background .1s' },
