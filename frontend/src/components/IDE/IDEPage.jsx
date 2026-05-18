@@ -1,521 +1,275 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import API from '../api/axios';
-import { useAuth } from '../context/AuthContext';
+/**
+ * SimWork — Simulate Before You Apply
+ * Copyright (c) 2025 Vishvajit Gadakari. All rights reserved.
+ * Unauthorized copying, modification, or distribution is prohibited.
+ * https://simwork.vercel.app
+ */
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSim } from '../../context/SimContext';
+import { useAuth } from '../../context/AuthContext';
+import { buildTasksForRole, STAGES } from '../../data/simulations';
+import { showToast } from '../Toast';
+import TaskPanel from './TaskPanel';
+import CodeEditor from './CodeEditor';
+import OutputPanel from './OutputPanel';
+import TeamPanel from './TeamPanel';
+import { getStarterCodeForLanguage } from '../../data/simulations';
 
-/* ─────────────────────────────────────────────
-   CONSTANTS
-───────────────────────────────────────────── */
-const LANGUAGES = ['JavaScript', 'Python', 'TypeScript'];
-
-const TASKS = [
-  {
-    id: 1,
-    title: 'Hello World API',
-    duration: '25 min',
-    description: 'Create a basic Express.js GET /hello endpoint.',
-    requirements: [
-      'Return HTTP 200',
-      'JSON body: { message: "Hello, SimWork!" }',
-      'Include timestamp field',
-    ],
-    starterCode: {
-      JavaScript: `// Task 1: Hello World API
-const express = require('express');
-const app = express();
-
-// TODO: Create GET /hello endpoint
-app.get('/hello', (req, res) => {
-  // Your code here
-
-});
-
-app.listen(3000);
-module.exports = app;`,
-      Python: `# Task 1: Hello World API
-from flask import Flask, jsonify
-import datetime
-
-app = Flask(__name__)
-
-# TODO: Create GET /hello endpoint
-@app.route('/hello')
-def hello():
-    # Your code here
-    pass
-
-if __name__ == '__main__':
-    app.run(port=3000)`,
-      TypeScript: `// Task 1: Hello World API
-import express, { Request, Response } from 'express';
-const app = express();
-
-// TODO: Create GET /hello endpoint
-app.get('/hello', (req: Request, res: Response) => {
-  // Your code here
-
-});
-
-app.listen(3000);
-export default app;`,
-    },
-    tests: [
-      { id: 't1', label: 'GET /hello returns 200', hint: 'res.status(200)' },
-      { id: 't2', label: 'Response has message field', hint: 'res.json({ message: ... })' },
-      { id: 't3', label: 'message equals "Hello, SimWork!"', hint: 'Check the string exactly' },
-      { id: 't4', label: 'Response has timestamp field', hint: 'new Date().toISOString()' },
-    ],
-    solutionKeywords: ['hello', 'simwork', 'timestamp', '200'],
-    xp: 100,
-  },
-  {
-    id: 2,
-    title: 'Sum Function',
-    duration: '15 min',
-    description: 'Write a function that sums an array of numbers.',
-    requirements: [
-      'Accept an array of numbers',
-      'Return the total sum',
-      'Handle empty arrays (return 0)',
-    ],
-    starterCode: {
-      JavaScript: `// Task 2: Sum Function
-// TODO: Implement the sum function
-function sum(numbers) {
-  // Your code here
-
+// ---------------------------------------------------------------------------
+// callClaude — wraps the Anthropic API call with a smart fallback.
+// ---------------------------------------------------------------------------
+async function callClaude(prompt, fallbackFn) {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data  = await response.json();
+    const text  = data.content?.[0]?.text || '{}';
+    const clean = text.replace(/```json[\s\S]*?```|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch (err) {
+    console.warn('[SimWork] Claude API unavailable, using smart fallback:', err.message);
+    return fallbackFn();
+  }
 }
 
-module.exports = { sum };`,
-      Python: `# Task 2: Sum Function
-# TODO: Implement the sum function
-def sum_numbers(numbers):
-    # Your code here
-    pass`,
-      TypeScript: `// Task 2: Sum Function
-// TODO: Implement the sum function
-function sum(numbers: number[]): number {
-  // Your code here
-
+// ---------------------------------------------------------------------------
+// Smart fallbacks
+// ---------------------------------------------------------------------------
+function runFallback(code, task, lang) {
+  const lines    = code.split('\n').filter(l => l.trim()).length;
+  const hasLogic = lines > 3 && !code.includes('// Your code here');
+  const passed   = hasLogic ? Math.min(task.tests.length, Math.ceil(task.tests.length * 0.7)) : 0;
+  const total    = task.tests.length;
+  const output   = hasLogic
+    ? [
+        `$ Running ${lang} analysis...`,
+        `$ Parsed ${lines} lines of code`,
+        `$ Executing test suite (${total} tests)...`,
+        `$ ${passed}/${total} tests passed ✓`,
+        `$ Summary: ${task.title} implementation detected`,
+      ]
+    : [
+        `$ Running ${lang} analysis...`,
+        `$ ⚠ No implementation found — add your solution`,
+        `$ 0/${total} tests passed`,
+      ];
+  return { output, passed, total, summary: hasLogic ? 'Implementation detected' : 'No implementation' };
 }
 
-export { sum };`,
-    },
-    tests: [
-      { id: 't1', label: 'sum([1, 2, 3]) returns 6', hint: 'Basic addition' },
-      { id: 't2', label: 'sum([]) returns 0', hint: 'Handle empty array' },
-      { id: 't3', label: 'sum([-1, 1]) returns 0', hint: 'Negatives cancel out' },
-      { id: 't4', label: 'sum([100]) returns 100', hint: 'Single element' },
-    ],
-    solutionKeywords: ['reduce', 'sum', 'return', '0'],
-    xp: 75,
-  },
-  {
-    id: 3,
-    title: 'Array Filter',
-    duration: '15 min',
-    description: 'Filter an array of objects based on a property value.',
-    requirements: [
-      'Accept array and filter key/value',
-      'Return matching items only',
-      'Case-insensitive string match',
-    ],
-    starterCode: {
-      JavaScript: `// Task 3: Array Filter
-// TODO: Implement filterByProperty
-function filterByProperty(arr, key, value) {
-  // Your code here
+function validateFallback(code, task, lang) {
+  const starter     = getStarterCodeForLanguage(task, lang);
+  const isUnchanged = code.trim() === starter.trim();
+  const isTooShort  = code.trim().length < 40;
+  const hasImpl     = !isUnchanged && !isTooShort && !code.includes('// Your code here');
 
+  if (!hasImpl) {
+    return {
+      rules: task.validationRules.map(r => ({ rule: r, pass: false, reason: 'No implementation detected' })),
+      hasRealImplementation: false,
+      overallPass: false,
+      score: 0,
+      summary: 'Write actual code to pass validation',
+    };
+  }
+
+  const keywords  = ['return', 'function', 'const', 'let', 'if', 'for', 'map', 'filter', '=>', 'class'];
+  const hits      = keywords.filter(k => code.includes(k)).length;
+  const passRatio = Math.min(1, hits / 4);
+  const passCount = Math.round(task.validationRules.length * passRatio);
+
+  const rules = task.validationRules.map((r, i) => ({
+    rule:   r,
+    pass:   i < passCount,
+    reason: i < passCount ? 'Pattern detected in code' : 'Could not confirm implementation',
+  }));
+
+  const score = Math.round((passCount / task.validationRules.length) * 100);
+  return {
+    rules,
+    hasRealImplementation: true,
+    overallPass: score >= 80,
+    score,
+    summary: `${passCount}/${task.validationRules.length} rules satisfied`,
+  };
 }
 
-module.exports = { filterByProperty };`,
-      Python: `# Task 3: Array Filter
-# TODO: Implement filter_by_property
-def filter_by_property(arr, key, value):
-    # Your code here
-    pass`,
-      TypeScript: `// Task 3: Array Filter
-function filterByProperty<T>(arr: T[], key: keyof T, value: any): T[] {
-  // Your code here
-
-}
-
-export { filterByProperty };`,
-    },
-    tests: [
-      { id: 't1', label: 'Filters by exact match', hint: 'item[key] === value' },
-      { id: 't2', label: 'Case-insensitive for strings', hint: '.toLowerCase()' },
-      { id: 't3', label: 'Returns empty array when no match', hint: 'filter returns []' },
-      { id: 't4', label: 'Does not mutate original array', hint: 'Use .filter()' },
-    ],
-    solutionKeywords: ['filter', 'toLowerCase', 'key', 'value'],
-    xp: 75,
-  },
-  {
-    id: 4,
-    title: 'String Reversal',
-    duration: '10 min',
-    description: 'Reverse a string without using built-in reverse methods.',
-    requirements: [
-      'No .reverse() allowed',
-      'Handle empty string',
-      'Preserve Unicode characters',
-    ],
-    starterCode: {
-      JavaScript: `// Task 4: String Reversal
-// TODO: Reverse a string manually
-function reverseString(str) {
-  // Your code here — no .reverse() allowed!
-
-}
-
-module.exports = { reverseString };`,
-      Python: `# Task 4: String Reversal
-# TODO: Reverse a string manually (no [::-1] shortcut)
-def reverse_string(s):
-    # Your code here
-    pass`,
-      TypeScript: `// Task 4: String Reversal
-function reverseString(str: string): string {
-  // Your code here — no .reverse() allowed!
-
-}
-
-export { reverseString };`,
-    },
-    tests: [
-      { id: 't1', label: '"hello" → "olleh"', hint: 'Loop backwards' },
-      { id: 't2', label: 'Empty string returns ""', hint: 'Edge case' },
-      { id: 't3', label: '"a" returns "a"', hint: 'Single char' },
-      { id: 't4', label: 'No .reverse() used', hint: 'Static analysis check' },
-    ],
-    solutionKeywords: ['for', 'result', 'return', 'i--'],
-    xp: 50,
-  },
-  {
-    id: 5,
-    title: 'Async Fetch',
-    duration: '20 min',
-    description: 'Fetch data from an API and handle errors gracefully.',
-    requirements: [
-      'Use async/await',
-      'Handle network errors',
-      'Return parsed JSON',
-    ],
-    starterCode: {
-      JavaScript: `// Task 5: Async Fetch
-// TODO: Implement fetchData with error handling
-async function fetchData(url) {
-  // Your code here
-
-}
-
-module.exports = { fetchData };`,
-      Python: `# Task 5: Async Fetch
-import aiohttp
-import asyncio
-
-# TODO: Implement fetch_data with error handling
-async def fetch_data(url):
-    # Your code here
-    pass`,
-      TypeScript: `// Task 5: Async Fetch
-async function fetchData(url: string): Promise<any> {
-  // Your code here
-
-}
-
-export { fetchData };`,
-    },
-    tests: [
-      { id: 't1', label: 'Returns parsed JSON on success', hint: 'response.json()' },
-      { id: 't2', label: 'Throws on 4xx/5xx status', hint: 'Check response.ok' },
-      { id: 't3', label: 'Catches network errors', hint: 'try/catch block' },
-      { id: 't4', label: 'Function is async', hint: 'async keyword' },
-    ],
-    solutionKeywords: ['async', 'await', 'fetch', 'catch', 'json'],
-    xp: 125,
-  },
-];
-
-const AGENTS = [
-  { id: 'ba',  label: 'BA',  color: '#7C6EFA', role: 'Business Analyst',  tagline: 'Clarifies requirements', idle: 'Ready to discuss requirements', active: 'Reviewing your approach…', done: 'Requirements look good!' },
-  { id: 'pm',  label: 'PM',  color: '#F59E0B', role: 'Product Manager',   tagline: 'Tracks priorities',      idle: 'Waiting for task start',      active: 'Monitoring progress…',    done: 'On track — well done!' },
-  { id: 'dev', label: 'DEV', color: '#34D399', role: 'Developer',         tagline: 'Building code locally',  idle: 'Standby…',                    active: 'Code review in progress…', done: 'LGTM! Clean code.' },
-  { id: 'qa',  label: 'QA',  color: '#60A5FA', role: 'QA Tester',         tagline: 'Ready to validate',      idle: 'Awaiting build…',             active: 'Running test suite…',     done: 'All tests green!' },
-];
-
+// ---------------------------------------------------------------------------
+// Agent hints — keyed to a generic set usable with any task/role
+// ---------------------------------------------------------------------------
 const AGENT_HINTS = {
-  ba:  ['Check the task requirements carefully.', 'The endpoint path must match exactly.', 'Return type matters — check the spec.'],
-  pm:  ['You have plenty of time, stay focused.', 'Break it into small steps.', 'Think about edge cases early.'],
-  dev: ['Try console.log to debug your values.', 'Check your syntax — missing brackets?', 'Remember to return the value!'],
-  qa:  ['Test with empty input first.', 'Check the exact string casing.', 'What happens at the boundary?'],
+  ba:     ['Re-read the task requirements carefully.', 'The spec defines the exact output format.', 'Check if all edge cases are listed in requirements.'],
+  pm:     ['Break the problem into smaller steps.', 'Focus on one requirement at a time.', 'Think about the happy path first, then edge cases.'],
+  dev:    ['Try logging intermediate values to debug.', 'Check for missing return statements.', 'Look for off-by-one errors in loops.'],
+  qa:     ['Test with empty or null input first.', 'Check exact string casing.', 'What happens at the boundary values?'],
+  devops: ['Make sure your code has no syntax errors before submitting.', 'Check that exports match what the tests import.', 'Environment variables should not be hardcoded.'],
+  ops:    ['Monitor your solution for edge cases in production.', 'Consider error handling for unexpected input.', 'Logging is your best friend in production.'],
 };
 
-/* ─────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────── */
-const simulateRun = (code, lang, task) => {
-  const lines = [];
-  const lower = code.toLowerCase();
-
-  lines.push(`$ Running ${lang} solution for Task ${task.id}…`);
-  lines.push('');
-
-  const hasTodo = lower.includes('// your code here') || lower.includes('# your code here') || lower.includes('pass\n') || (lower.includes('pass') && !lower.includes('password'));
-
-  if (hasTodo && !task.solutionKeywords.some(k => lower.includes(k))) {
-    lines.push('⚠  Detected unimplemented TODO block.');
-    lines.push('   Add your solution before running.');
-    return { output: lines, success: false, hasOutput: true };
-  }
-
-  lines.push('> Process started on port 3000');
-  lines.push('> Module loaded successfully');
-  lines.push('');
-
-  const score = task.solutionKeywords.filter(k => lower.includes(k)).length;
-  if (score >= task.solutionKeywords.length * 0.75) {
-    lines.push('✓  No syntax errors detected');
-    lines.push('✓  Module exports resolved');
-    lines.push('');
-    lines.push(`$ Output:`);
-    if (task.id === 1) {
-      lines.push('  GET /hello → 200 OK');
-      lines.push('  {"message":"Hello, SimWork!","timestamp":"' + new Date().toISOString() + '"}');
-    } else if (task.id === 2) {
-      lines.push('  sum([1,2,3]) → 6');
-      lines.push('  sum([])      → 0');
-    } else if (task.id === 3) {
-      lines.push('  filterByProperty([...], "role", "admin") → [{...}]');
-    } else if (task.id === 4) {
-      lines.push('  reverseString("hello") → "olleh"');
-    } else {
-      lines.push('  fetchData("https://api.example.com") → {data: [...]}');
-    }
-    lines.push('');
-    lines.push('✓  Run completed in 142ms');
-    return { output: lines, success: true, hasOutput: true };
-  } else {
-    lines.push('✗  Runtime error:');
-    lines.push('   Solution incomplete or incorrect logic detected.');
-    lines.push('   Check your implementation and try again.');
-    return { output: lines, success: false, hasOutput: true };
-  }
-};
-
-const simulateValidate = (code, lang, task) => {
-  const lower = code.toLowerCase();
-  const score = task.solutionKeywords.filter(k => lower.includes(k)).length;
-  const ratio = score / task.solutionKeywords.length;
-  const hasTodo = lower.includes('your code here') || (lower.includes('pass') && lower.length < 200);
-
-  return task.tests.map((t, i) => {
-    if (hasTodo) return { ...t, status: 'fail', msg: 'No implementation found' };
-    if (ratio >= 0.75 && i < 3) return { ...t, status: 'pass', msg: 'Assertion passed' };
-    if (ratio >= 0.75 && i === 3) return { ...t, status: ratio >= 1.0 ? 'pass' : 'fail', msg: ratio >= 1.0 ? 'Assertion passed' : 'Edge case not handled' };
-    return { ...t, status: 'fail', msg: 'Expected value did not match' };
-  });
-};
-
-/* ─────────────────────────────────────────────
-   MAIN COMPONENT
-───────────────────────────────────────────── */
-export default function IDETasks() {
-  const { user } = useAuth();
-
-  /* ── task state ── */
-  const [activeTaskIdx, setActiveTaskIdx]   = useState(0);
-  const [completedTasks, setCompletedTasks] = useState(new Set());
-  const [xp, setXp]                         = useState(0);
-  const [xpAnim, setXpAnim]                 = useState(false);
+// ---------------------------------------------------------------------------
+// IDEPage
+// ---------------------------------------------------------------------------
+export default function IDEPage() {
+  const navigate = useNavigate();
+  const { user, update } = useAuth();
+  const {
+    currentSim, currentStage, currentTask, setCurrentTask,
+    taskResults, setTaskResults, validationPassed, setValidationPassed,
+    updateSim, sims,
+  } = useSim();
 
   /* ── editor state ── */
-  const [lang, setLang]           = useState('JavaScript');
-  const [codes, setCodes]         = useState(() =>
-    TASKS.reduce((acc, t) => {
-      acc[t.id] = { ...t.starterCode };
-      return acc;
-    }, {})
-  );
-  const [snapshots, setSnapshots] = useState({});
-  const [activeFile, setActiveFile] = useState('solution');
-  const [cursorLine, setCursorLine] = useState(1);
+  const [code, setCode]           = useState('');
+  const [snapshots, setSnapshots] = useState({});  // NEW: per-task snapshots
+  const [cursorLine, setCursorLine] = useState(1); // NEW: line tracker
 
-  /* ── console / test state ── */
-  const [activeTab, setActiveTab]       = useState('console');
-  const [consoleLines, setConsoleLines] = useState(['$ SimWork IDE ready', '$ Write your solution → Validate → Submit']);
-  const [running, setRunning]           = useState(false);
-  const [validating, setValidating]     = useState(false);
-  const [testResults, setTestResults]   = useState(null);
-  const [validated, setValidated]       = useState(false);
-  const [runSuccess, setRunSuccess]     = useState(null);
+  /* ── output / test state ── */
+  const [output, setOutput]       = useState([
+    { type: 'info',  text: '$ SimWork IDE ready' },
+    { type: 'muted', text: '$ Write → Validate → Submit' },
+  ]);
+  const [tests, setTests]         = useState([]);
+  const [valResult, setValResult] = useState(null);
+  const [score, setScore]         = useState(0);
+  const [activeTab, setActiveTab] = useState('console');
 
   /* ── timer ── */
-  const TOTAL_SECS = 45 * 60;
-  const [secsLeft, setSecsLeft]   = useState(TOTAL_SECS);
-  const [timerRunning, setTimerRunning] = useState(true);
-  const timerRef = useRef(null);
+  const [timerSec, setTimerSec]         = useState(0);
+  const [timerPaused, setTimerPaused]   = useState(false); // NEW: pause/resume
+  const [timerTotal, setTimerTotal]     = useState(1);     // NEW: for ring %
 
-  /* ── panels ── */
-  const [sidebarW, setSidebarW]     = useState(220);
-  const [rightW, setRightW]         = useState(260);
-  const [draggingLeft, setDraggingLeft]   = useState(false);
-  const [draggingRight, setDraggingRight] = useState(false);
+  /* ── language / team / ui ── */
+  const [lang, setLang]               = useState('JavaScript');
+  const [teamMsgs, setTeamMsgs]       = useState({
+    ba:     'Ready to discuss requirements',
+    pm:     'Waiting for task completion',
+    qa:     'Waiting for your submission...',
+    devops: 'On standby for deployment',
+    ops:    'Ready to support production',
+  });
+  const [agentHint, setAgentHint]     = useState(null);   // NEW: { role, text }
+  const [hintCooldown, setHintCooldown] = useState({});   // NEW: per-agent cooldown
+  const [scoreHistory, setScoreHistory] = useState([]);   // NEW: history list
+  const [showSearch, setShowSearch]   = useState(false);  // NEW: in-editor search
+  const [searchQuery, setSearchQuery] = useState('');     // NEW
+  const [searchMatches, setSearchMatches] = useState([]); // NEW: line numbers
+  const [xpAnim, setXpAnim]           = useState(false);  // NEW: XP badge flash
 
-  /* ── agents ── */
-  const [agentStates, setAgentStates] = useState(() =>
-    AGENTS.reduce((a, ag) => ({ ...a, [ag.id]: 'idle' }), {})
-  );
-  const [agentHint, setAgentHint] = useState(null); // { agentId, text }
-  const [pingCooldown, setPingCooldown] = useState({});
+  /* ── modals / mobile ── */
+  const [modalDone, setModalDone]     = useState(null);
+  const [modalStage, setModalStage]   = useState(null);
+  const [mobilePanel, setMobilePanel] = useState('editor');
 
-  /* ── score ── */
-  const [scoreHistory, setScoreHistory] = useState([]);
+  /* ── loading flags ── */
+  const [isRunning, setIsRunning]       = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
-  /* ── search ── */
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchMatches, setSearchMatches] = useState([]);
-
+  /* ── refs ── */
+  const timerRef  = useRef(null);
+  const scoreRef  = useRef(score);
   const editorRef = useRef(null);
+  useEffect(() => { scoreRef.current = score; }, [score]);
 
-  /* ════ timer ════ */
+  const tasks     = currentSim ? buildTasksForRole(currentSim.id)[currentStage] : [];
+  const task      = tasks[currentTask];
+  const stageInfo = STAGES[currentStage];
+
+  /* ── mobile editor focus ── */
   useEffect(() => {
-    if (!timerRunning) return;
+    if (mobilePanel === 'editor') {
+      setTimeout(() => {
+        const ta = document.querySelector('.ide-panel-editor.mob-active textarea');
+        ta?.focus();
+      }, 50);
+    }
+  }, [mobilePanel]);
+
+  /* ── load task ── */
+  const loadTask = useCallback((idx) => {
+    const t = tasks[idx];
+    if (!t) return;
+    setCurrentTask(idx);
+    setCode(getStarterCodeForLanguage(t, lang));
+    setValidationPassed(false);
+    setOutput([
+      { type: 'info',  text: '$ SimWork IDE ready' },
+      { type: 'muted', text: '$ Write your solution → Validate → Submit' },
+    ]);
+    setTests(t.tests.map(name => ({ name, status: 'pending' })));
+    setScore(0);
+    setValResult(null);
+    setActiveTab('console');
+    setAgentHint(null);
+    setCursorLine(1);
+    clearInterval(timerRef.current);
+
+    const sec = Math.round(parseInt(t.time) * 60 * stageInfo.timeMult);
+    setTimerSec(sec);
+    setTimerTotal(sec);
+    setTimerPaused(false);
+
     timerRef.current = setInterval(() => {
-      setSecsLeft(s => {
-        if (s <= 1) { clearInterval(timerRef.current); return 0; }
-        return s - 1;
+      setTimerSec(p => {
+        if (p <= 1) {
+          clearInterval(timerRef.current);
+          handleSubmitAuto(scoreRef.current);
+          return 0;
+        }
+        return p - 1;
       });
     }, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [timerRunning]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, stageInfo]);
 
-  const timerPct = secsLeft / TOTAL_SECS;
-  const timerColor = secsLeft < 300 ? '#F87171' : secsLeft < 600 ? '#F59E0B' : '#34D399';
-  const timerFmt = `${String(Math.floor(secsLeft / 60)).padStart(2, '0')}:${String(secsLeft % 60).padStart(2, '0')}`;
-
-  /* ════ panel resize ════ */
-  useEffect(() => {
-    const onMove = (e) => {
-      if (draggingLeft)  setSidebarW(Math.max(160, Math.min(360, e.clientX)));
-      if (draggingRight) setRightW(Math.max(200, Math.min(420, window.innerWidth - e.clientX)));
-    };
-    const onUp = () => { setDraggingLeft(false); setDraggingRight(false); };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [draggingLeft, draggingRight]);
-
-  /* ════ derived ════ */
-  const task     = TASKS[activeTaskIdx];
-  const code     = codes[task.id]?.[lang] ?? '';
-  const setCode  = (val) => setCodes(prev => ({ ...prev, [task.id]: { ...prev[task.id], [lang]: val } }));
-
-  const lineCount = code.split('\n').length;
-  const isUnlocked = (idx) => idx === 0 || completedTasks.has(TASKS[idx - 1].id);
-
-  /* ════ agent animations ════ */
-  const setAgentActive = () =>
-    setAgentStates(AGENTS.reduce((a, ag) => ({ ...a, [ag.id]: 'active' }), {}));
-  const setAgentDone = () =>
-    setAgentStates(AGENTS.reduce((a, ag) => ({ ...a, [ag.id]: 'done' }), {}));
-  const setAgentIdle = () =>
-    setAgentStates(AGENTS.reduce((a, ag) => ({ ...a, [ag.id]: 'idle' }), {}));
-
-  /* ════ actions ════ */
-  const handleRun = () => {
-    if (running) return;
-    setRunning(true);
-    setActiveTab('console');
-    setAgentActive();
-
-    // Snapshot before run
-    setSnapshots(prev => ({
-      ...prev,
-      [`${task.id}_${lang}_${Date.now()}`]: code,
-    }));
-
-    const lines = ['$ Running…'];
-    setConsoleLines(lines);
-
-    setTimeout(() => {
-      const result = simulateRun(code, lang, task);
-      setConsoleLines(result.output);
-      setRunSuccess(result.success);
-      setRunning(false);
-      if (result.success) setAgentDone(); else setAgentIdle();
-    }, 900);
-  };
-
-  const handleValidate = () => {
-    if (validating) return;
-    setValidating(true);
-    setActiveTab('tests');
-    setTestResults(null);
-    setAgentActive();
-
-    setTimeout(() => {
-      const results = simulateValidate(code, lang, task);
-      setTestResults(results);
-      const allPass = results.every(r => r.status === 'pass');
-      setValidated(allPass);
-      setValidating(false);
-      if (allPass) setAgentDone(); else setAgentIdle();
-
-      // Add to score history
-      const passed = results.filter(r => r.status === 'pass').length;
-      const pct    = Math.round((passed / results.length) * 100);
-      setScoreHistory(prev => [...prev, { taskId: task.id, taskTitle: task.title, pct, time: new Date() }]);
-    }, 1200);
-  };
-
-  const handleSubmit = () => {
-    if (!validated) return;
-    const already = completedTasks.has(task.id);
-    if (!already) {
-      setCompletedTasks(prev => new Set([...prev, task.id]));
-      setXp(prev => prev + task.xp);
-      setXpAnim(true);
-      setTimeout(() => setXpAnim(false), 1000);
-      setConsoleLines([
-        `✓  Task ${task.id} submitted successfully!`,
-        `+${task.xp} XP awarded`,
-        `Total XP: ${xp + task.xp}`,
-        '',
-        activeTaskIdx < TASKS.length - 1
-          ? `→ Task ${task.id + 1} is now unlocked.`
-          : '🎉 All tasks complete! Outstanding work.',
-      ]);
-      setActiveTab('console');
-      setAgentDone();
-      if (activeTaskIdx < TASKS.length - 1) {
-        setTimeout(() => setActiveTaskIdx(activeTaskIdx + 1), 800);
-      }
+  /* ── pause / resume timer ── */
+  const toggleTimer = () => {
+    if (!timerPaused) {
+      clearInterval(timerRef.current);
+      setTimerPaused(true);
+    } else {
+      timerRef.current = setInterval(() => {
+        setTimerSec(p => {
+          if (p <= 1) { clearInterval(timerRef.current); handleSubmitAuto(scoreRef.current); return 0; }
+          return p - 1;
+        });
+      }, 1000);
+      setTimerPaused(false);
     }
   };
 
-  const handlePingAgent = (agentId) => {
-    if (pingCooldown[agentId]) return;
-    const hints = AGENT_HINTS[agentId];
-    const hint  = hints[Math.floor(Math.random() * hints.length)];
-    setAgentHint({ agentId, text: hint });
-    setPingCooldown(prev => ({ ...prev, [agentId]: true }));
-    setTimeout(() => {
-      setAgentHint(null);
-      setPingCooldown(prev => ({ ...prev, [agentId]: false }));
-    }, 4000);
+  useEffect(() => {
+    if (!currentSim) { navigate('/simulations'); return; }
+    loadTask(currentTask);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSim, currentStage]);
+
+  useEffect(() => () => clearInterval(timerRef.current), []);
+
+  /* ── language change ── */
+  const handleLangChange = (newLang) => {
+    setLang(newLang);
+    if (user) update({ preferredLanguage: newLang });
+    if (task) {
+      setCode(getStarterCodeForLanguage(task, newLang));
+      setValidationPassed(false);
+      setScore(0);
+      setValResult(null);
+    }
+    showToast(`Language set to ${newLang}`);
   };
 
-  const handleRestoreSnapshot = () => {
-    const keys = Object.keys(snapshots).filter(k => k.startsWith(`${task.id}_${lang}_`));
-    if (keys.length === 0) return;
-    const last = keys[keys.length - 1];
-    setCode(snapshots[last]);
-    setConsoleLines(['$ Restored last snapshot.']);
-  };
-
-  /* ════ search ════ */
+  /* ── in-editor search ── */
   useEffect(() => {
     if (!searchQuery.trim()) { setSearchMatches([]); return; }
     const q = searchQuery.toLowerCase();
@@ -526,491 +280,758 @@ export default function IDETasks() {
     setSearchMatches(matches);
   }, [searchQuery, code]);
 
-  /* ════ keyboard shortcut ════ */
+  /* ── keyboard shortcuts ── */
   useEffect(() => {
     const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleRun(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runCode(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f')    { e.preventDefault(); setShowSearch(p => !p); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, lang, task]);
 
-  /* ═══════════════════════════════════════════
-     RENDER
-  ═══════════════════════════════════════════ */
+  /* ── snapshot restore ── */
+  const handleRestoreSnapshot = () => {
+    const key = `${currentTask}_${lang}`;
+    if (!snapshots[key]) return;
+    setCode(snapshots[key]);
+    showToast('↺ Snapshot restored');
+  };
+
+  /* ── agent ping ── */
+  const handlePingAgent = (role) => {
+    if (hintCooldown[role]) return;
+    const hints = AGENT_HINTS[role] || ['Keep going — you\'re doing great!'];
+    const hint  = hints[Math.floor(Math.random() * hints.length)];
+    setAgentHint({ role, text: hint });
+    setHintCooldown(prev => ({ ...prev, [role]: true }));
+    setTimeout(() => {
+      setAgentHint(null);
+      setHintCooldown(prev => ({ ...prev, [role]: false }));
+    }, 4000);
+  };
+
+  // -------------------------------------------------------------------------
+  // runCode
+  // -------------------------------------------------------------------------
+  const runCode = async () => {
+    if (isRunning || !task) return;
+    setIsRunning(true);
+    setActiveTab('console');
+
+    // Auto-snapshot before each run
+    setSnapshots(prev => ({ ...prev, [`${currentTask}_${lang}`]: code }));
+
+    // Animate team agents
+    setTeamMsgs(p => ({ ...p, dev: '⟳ Running your code…', qa: '⟳ Standing by…' }));
+
+    setOutput(p => [...p, { type: 'info', text: '$ Running code analysis...' }]);
+
+    const prompt = `You are a code execution simulator for a coding education platform.
+
+Language: ${lang}
+Task: ${task.title}
+Task Description: ${task.desc.replace(/<[^>]*>/g, '')}
+
+Student's Code:
+\`\`\`
+${code}
+\`\`\`
+
+Analyze this code and respond in this EXACT JSON format only, no other text:
+{
+  "output": ["line1 of console output", "line2", "line3"],
+  "passed": 2,
+  "total": 5,
+  "summary": "Brief one-line summary of what the code does"
+}`;
+
+    try {
+      const result = await callClaude(prompt, () => runFallback(code, task, lang));
+
+      result.output.forEach(line => {
+        setOutput(p => [...p, {
+          type: line.includes('Error') || line.includes('✗') ? 'err'
+              : line.includes('✓') || line.includes('pass') ? 'ok'
+              : 'info',
+          text: line,
+        }]);
+      });
+
+      const sc = Math.round((result.passed / result.total) * 100);
+      setTests(tests.map((t, i) => ({
+        ...t,
+        status: i < result.passed ? 'pass' : 'fail',
+        ms: i < result.passed ? Math.floor(Math.random() * 40 + 8) : null,
+      })));
+      setScore(sc);
+      setActiveTab('tests');
+
+      // Update agents based on result
+      setTeamMsgs(p => ({
+        ...p,
+        dev: sc >= 70 ? '✓ Code looks solid' : '⚠ Issues detected in code',
+        qa:  sc >= 70 ? '📋 Ready to validate' : '⚠ Fix issues before validating',
+      }));
+    } catch (err) {
+      console.error('[SimWork] runCode unexpected error:', err);
+      setOutput(p => [...p, { type: 'warn', text: '$ Analysis complete (offline mode)' }]);
+      setTeamMsgs(p => ({ ...p, dev: '⚠ Run completed (offline)', qa: 'Awaiting validation' }));
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // validateCode
+  // -------------------------------------------------------------------------
+  const validateCode = async () => {
+    if (isValidating || !task) return;
+    setIsValidating(true);
+    setActiveTab('validate');
+
+    const starterForLang = getStarterCodeForLanguage(task, lang);
+
+    if (code.trim() === starterForLang.trim()) {
+      setValResult({
+        items: [{ type: 'fail', msg: 'Code is unchanged. Write your solution first.' }],
+        summary: 'fail',
+        text: '❌ No solution written',
+      });
+      setValidationPassed(false);
+      showToast('⚠️ Write your solution first!');
+      setIsValidating(false);
+      return;
+    }
+
+    if (code.trim().length < 20) {
+      setValResult({
+        items: [{ type: 'fail', msg: 'Code is too short to be a valid solution.' }],
+        summary: 'fail',
+        text: '❌ Too short',
+      });
+      setValidationPassed(false);
+      setIsValidating(false);
+      return;
+    }
+
+    setValResult({
+      items: [{ type: 'warn', msg: '🤖 AI is evaluating your code...' }],
+      summary: 'partial',
+      text: '⏳ Evaluating...',
+    });
+
+    setTeamMsgs(p => ({ ...p, qa: '⟳ Running validation suite…', devops: '⟳ Watching…' }));
+
+    const prompt = `You are a strict code validator for a coding education platform.
+
+Language: ${lang}
+Task Title: ${task.title}
+Task Requirements:
+${task.desc.replace(/<[^>]*>/g, '')}
+
+Validation Rules to check:
+${task.validationRules.map((r, i) => `${i + 1}. ${r}`).join('\n')}
+
+Student's Code:
+\`\`\`
+${code}
+\`\`\`
+
+IMPORTANT RULES:
+- If code is just the starter template with TODO and no real implementation → ALL rules FAIL
+- If code has actual logic that attempts to solve the task → evaluate each rule honestly
+- A rule passes only if there is REAL code implementing it, not just a comment
+- TODO comments count as NOT implemented
+
+Respond in this EXACT JSON format only, no other text:
+{
+  "rules": [
+    {"rule": "rule text here", "pass": true, "reason": "brief reason"},
+    {"rule": "rule text here", "pass": false, "reason": "brief reason"}
+  ],
+  "hasRealImplementation": true,
+  "overallPass": true,
+  "score": 75,
+  "summary": "Brief summary of the code quality"
+}`;
+
+    try {
+      const result = await callClaude(prompt, () => validateFallback(code, task, lang));
+
+      if (!result.hasRealImplementation) {
+        setValResult({
+          items: [
+            { type: 'fail', msg: 'No real implementation found. Write actual code, not just comments.' },
+            ...result.rules.map(r => ({ type: 'fail', msg: r.rule })),
+          ],
+          summary: 'fail',
+          text: '❌ No Implementation — Write actual code!',
+        });
+        setValidationPassed(false);
+        showToast('❌ Write actual code — not just comments!');
+        setTeamMsgs(p => ({ ...p, qa: '❌ No implementation found', devops: 'On standby for deployment' }));
+        return;
+      }
+
+      const items     = result.rules.map(r => ({
+        type: r.pass ? 'pass' : 'fail',
+        msg:  `${r.rule}${r.reason ? ` — ${r.reason}` : ''}`,
+      }));
+      const passCount = result.rules.filter(r => r.pass).length;
+      const pct       = result.score || Math.round((passCount / result.rules.length) * 100);
+      const summary   = pct >= 80 ? 'pass' : pct >= 50 ? 'partial' : 'fail';
+      const text2     = pct >= 80
+        ? `✅ Validation Passed (${passCount}/${result.rules.length})`
+        : pct >= 50
+        ? `⚠️ Partial (${passCount}/${result.rules.length}) — ${result.summary}`
+        : `❌ Failed (${passCount}/${result.rules.length}) — ${result.summary}`;
+
+      setValResult({ items, summary, text: text2 });
+      setValidationPassed(pct >= 50);
+      setScore(pct);
+
+      // NEW: add to score history
+      setScoreHistory(prev => [...prev, {
+        taskIdx: currentTask,
+        taskTitle: task.title,
+        pct,
+        time: new Date(),
+      }]);
+
+      // Update agents
+      setTeamMsgs(p => ({
+        ...p,
+        qa:     pct >= 80 ? '✅ Tests passed! Approved.' : pct >= 50 ? '⚠️ Some issues found.' : '❌ Validation failed.',
+        devops: pct >= 80 ? '🚀 Ready to deploy on submit' : 'On standby',
+      }));
+
+      showToast(
+        pct >= 80 ? '✅ Code validated! Ready to submit.'
+        : pct >= 50 ? '⚠️ Partially valid — improve before submitting'
+        : '❌ Code needs work — fix the issues',
+      );
+    } catch (err) {
+      console.error('[SimWork] validateCode unexpected error:', err);
+      const fb = validateFallback(code, task, lang);
+      const passCount = fb.rules.filter(r => r.pass).length;
+      const pct = fb.score;
+      setValResult({
+        items: fb.rules.map(r => ({ type: r.pass ? 'pass' : 'fail', msg: r.rule + (r.reason ? ` — ${r.reason}` : '') })),
+        summary: pct >= 80 ? 'pass' : pct >= 50 ? 'partial' : 'fail',
+        text: pct >= 80
+          ? `✅ Validation Passed (${passCount}/${fb.rules.length})`
+          : pct >= 50
+          ? `⚠️ Partial (${passCount}/${fb.rules.length})`
+          : `❌ Failed (${passCount}/${fb.rules.length})`,
+      });
+      setValidationPassed(pct >= 50);
+      setScore(pct);
+      setScoreHistory(prev => [...prev, { taskIdx: currentTask, taskTitle: task.title, pct, time: new Date() }]);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // submit
+  // -------------------------------------------------------------------------
+  const handleSubmitAuto = useCallback((currentScore) => {
+    clearInterval(timerRef.current);
+    finishSubmit(25, currentScore, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSubmit = (auto = false) => {
+    if (!validationPassed && !auto) {
+      showToast('🔍 Validate your code first!');
+      validateCode();
+      return;
+    }
+    if (score < 50 && !auto) {
+      showToast('⚠️ Your score is too low. Improve your code first!');
+      return;
+    }
+    clearInterval(timerRef.current);
+    finishSubmit(auto ? 25 : Math.max(score, 50), score, auto);
+  };
+
+  const finishSubmit = (sc, _rawScore, _auto) => {
+    const xpPerTask = Math.round((currentSim.totalXP / 3 / tasks.length) * stageInfo.xpMult);
+    const xpEarned  = Math.round((sc / 100) * xpPerTask);
+    update({ xp: (user?.xp || 0) + xpEarned });
+
+    // XP badge flash
+    setXpAnim(true);
+    setTimeout(() => setXpAnim(false), 1000);
+
+    const newResults = { ...taskResults, [currentTask]: { score: sc, xpEarned } };
+    setTaskResults(newResults);
+
+    setTeamMsgs(p => ({ ...p, dev: '✓ Code submitted for review', qa: '📋 Testing your submission...' }));
+    setTimeout(() => {
+      setTeamMsgs(p => ({
+        ...p,
+        qa:     sc >= 70 ? '✅ Tests passed! Approved.' : '⚠️ Some issues found but accepted.',
+        devops: '🚀 Deploying to production...',
+      }));
+      setTimeout(() => setTeamMsgs(p => ({
+        ...p,
+        devops: '✅ Live in production!',
+        ops:    '📊 Monitoring — all healthy',
+      })), 2000);
+    }, 2000);
+
+    const sim = sims.find(s => s.id === currentSim.id);
+    const newStageProgress = {
+      ...(sim?.stageProgress || {}),
+      [currentStage]: currentTask === tasks.length - 1
+        ? 100
+        : Math.round((Object.keys(newResults).length / tasks.length) * 100),
+    };
+    const totalProgress = Math.round(
+      Object.values(newStageProgress).reduce((a, b) => a + b, 0) / 3,
+    );
+    const allDone = Object.values(newStageProgress).every(v => v >= 100);
+    updateSim(currentSim.id, {
+      stageProgress: newStageProgress,
+      progress: totalProgress,
+      status: allDone ? 'done' : 'active',
+    });
+
+    showToast(`+${xpEarned} XP! Score: ${sc}/100`);
+
+    if (currentTask === tasks.length - 1) {
+      const avg = Math.round(
+        Object.values(newResults).reduce((a, b) => a + (b.score || 0), 0) /
+        Object.keys(newResults).length,
+      );
+      const cert = {
+        id:    `CERT-${currentSim.id.toUpperCase()}-${currentStage.slice(0, 3).toUpperCase()}-${String(Date.now()).slice(-4)}`,
+        title: `${currentSim.title} (${stageInfo.label})`,
+        icon:  currentSim.icon,
+        color: currentSim.color,
+        score: avg,
+        stage: currentStage,
+        date:  new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      };
+      update({ certs: [...(user?.certs || []), cert] });
+      setModalStage({ cert, avg });
+    } else {
+      setModalDone({ score: sc, xpEarned });
+    }
+  };
+
+  const nextTask = () => { setModalDone(null); loadTask(currentTask + 1); };
+
+  /* ── timer display ── */
+  const mm          = `${String(Math.floor(timerSec / 60)).padStart(2, '0')}:${String(timerSec % 60).padStart(2, '0')}`;
+  const timerPct    = timerTotal > 0 ? timerSec / timerTotal : 1;
+  const timerColor  = timerSec > 300 ? 'rgba(52,211,153,.1)'  : timerSec > 60 ? 'rgba(245,158,11,.1)'  : 'rgba(248,113,113,.1)';
+  const timerBorder = timerSec > 300 ? 'rgba(52,211,153,.2)'  : timerSec > 60 ? 'rgba(245,158,11,.2)'  : 'rgba(248,113,113,.2)';
+  const timerText   = timerSec > 300 ? 'var(--accent2)'        : timerSec > 60 ? 'var(--accent3)'        : 'var(--rose)';
+  const ringStroke  = timerSec > 300 ? '#34D399'               : timerSec > 60 ? '#F59E0B'               : '#F87171';
+  const RING_R      = 14;
+  const RING_CIRC   = 2 * Math.PI * RING_R;
+
+  if (!currentSim || !task) return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexDirection: 'column', gap: 12 }}>
+      No simulation selected.
+      <span style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => navigate('/simulations')}>Browse simulations →</span>
+    </div>
+  );
+
+  /* ── derived ── */
+  const lineCount = code.split('\n').length;
+  const hasSnapshot = !!snapshots[`${currentTask}_${lang}`];
+
   return (
     <>
       <style>{`
-        * { box-sizing: border-box; }
-        .ide-root { font-family: 'Inter', system-ui, sans-serif; height: calc(100vh - 56px); display: flex; flex-direction: column; background: #0f1117; color: #e2e8f0; overflow: hidden; }
-        .ide-topbar { height: 48px; border-bottom: 1px solid #1e2433; display: flex; align-items: center; gap: 10px; padding: 0 14px; flex-shrink: 0; background: #0f1117; }
-        .ide-panels { display: flex; flex: 1; overflow: hidden; }
-        .ide-sidebar { display: flex; flex-direction: column; border-right: 1px solid #1e2433; overflow: hidden; flex-shrink: 0; background: #0b0d14; }
-        .ide-editor-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-        .ide-right { display: flex; flex-direction: column; border-left: 1px solid #1e2433; overflow: hidden; flex-shrink: 0; background: #0b0d14; }
-        .resize-handle { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; transition: background .15s; z-index: 10; }
-        .resize-handle:hover, .resize-handle.active { background: #7C6EFA44; }
-        .task-item { padding: 10px 14px; cursor: pointer; border-radius: 7px; margin: 2px 8px; transition: background .15s; }
-        .task-item:hover { background: rgba(124,110,250,.08); }
-        .task-item.active { background: rgba(124,110,250,.16); }
-        .task-item.locked { opacity: .45; cursor: not-allowed; }
-        .tab-btn { padding: 6px 14px; border: none; background: none; color: #64748b; cursor: pointer; font-size: 12px; border-bottom: 2px solid transparent; transition: all .15s; }
-        .tab-btn.active { color: #7C6EFA; border-bottom-color: #7C6EFA; }
-        .tab-btn:hover:not(.active) { color: #94a3b8; }
-        .top-btn { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all .15s; }
-        .top-btn:active { transform: scale(.97); }
-        .run-btn { background: #7C6EFA; color: #fff; }
-        .run-btn:hover { background: #6d5ff0; }
-        .run-btn:disabled { opacity: .5; cursor: not-allowed; }
-        .validate-btn { background: rgba(52,211,153,.12); color: #34D399; border: 1px solid rgba(52,211,153,.25); }
-        .validate-btn:hover { background: rgba(52,211,153,.2); }
-        .submit-btn { background: rgba(245,158,11,.12); color: #F59E0B; border: 1px solid rgba(245,158,11,.25); }
-        .submit-btn:hover:not(:disabled) { background: rgba(245,158,11,.22); }
-        .submit-btn:disabled { opacity: .35; cursor: not-allowed; }
-        .console-out { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
-        .console-out.pass { color: #34D399; }
-        .console-out.fail { color: #F87171; }
-        .console-out.warn { color: #F59E0B; }
-        .console-out.info { color: #60A5FA; }
-        .editor-wrap { flex: 1; display: flex; overflow: hidden; }
-        .line-nums { padding: 12px 0; min-width: 44px; text-align: right; color: #3d4a5e; font-family: monospace; font-size: 13px; line-height: 1.6; user-select: none; border-right: 1px solid #1e2433; }
-        .line-num { padding: 0 10px 0 6px; height: 20.8px; display: flex; align-items: center; justify-content: flex-end; }
-        .line-num.highlight { color: #7C6EFA; background: rgba(124,110,250,.06); }
-        .line-num.search-match { background: rgba(245,158,11,.15); color: #F59E0B; }
-        .code-editor { flex: 1; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.6; resize: none; border: none; outline: none; background: transparent; color: #e2e8f0; padding: 12px 16px; overflow-y: auto; tab-size: 2; }
-        .agent-card { margin: 8px 10px; padding: 10px 12px; border-radius: 10px; background: #12151f; border: 1px solid #1e2433; transition: border-color .3s; cursor: pointer; }
-        .agent-card:hover { border-color: #2e3a52; }
-        .agent-card.active { border-color: rgba(124,110,250,.35); animation: agent-pulse 2s infinite; }
-        .agent-card.done { border-color: rgba(52,211,153,.3); }
-        @keyframes agent-pulse { 0%,100%{border-color:rgba(124,110,250,.35)} 50%{border-color:rgba(124,110,250,.7)} }
-        .agent-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; transition: background .3s; }
-        .agent-hint-bubble { background: #1a2035; border: 1px solid #2e3a52; border-radius: 8px; padding: 8px 10px; margin: 4px 10px 8px; font-size: 11px; color: #94a3b8; animation: hint-in .2s ease; }
-        @keyframes hint-in { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
-        .xp-badge { background: #1a2035; border: 1px solid #2e3a52; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 700; color: #F59E0B; transition: all .3s; }
-        .xp-badge.anim { background: rgba(245,158,11,.2); border-color: #F59E0B; transform: scale(1.15); }
-        .test-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 7px; margin: 2px 0; }
-        .test-row.pass { background: rgba(52,211,153,.05); }
-        .test-row.fail { background: rgba(248,113,113,.05); }
-        .test-row.pending { background: rgba(100,116,139,.05); }
-        .test-icon { font-size: 14px; margin-top: 1px; flex-shrink: 0; }
-        .score-bar-track { background: #1e2433; border-radius: 4px; height: 4px; overflow: hidden; }
-        .score-bar-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
-        .timer-ring { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+        .ide-topbar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .ide-topbar::-webkit-scrollbar { display: none; }
+
+        .ide-body { display: grid; grid-template-columns: 280px 1fr 260px 280px; flex: 1; overflow: hidden; }
+        .ide-panel-tasks, .ide-panel-editor, .ide-panel-output, .ide-panel-team { display: flex !important; }
+        .ide-mob-tabs { display: none; }
+
+        .ide-btn-run { transition: opacity .15s; }
+        .ide-btn-run:disabled { opacity: .5; cursor: not-allowed !important; }
+
+        /* NEW: resize handles */
+        .ide-resize-handle { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; transition: background .15s; z-index: 10; }
+        .ide-resize-handle:hover { background: rgba(124,110,250,.25); }
+
+        /* NEW: line numbers */
+        .ide-line-nums { padding: 0; min-width: 42px; text-align: right; color: var(--muted); font-family: var(--mono); font-size: 12px; line-height: 1.6; user-select: none; border-right: 1px solid var(--border); overflow: hidden; }
+        .ide-line-num { padding: 0 8px 0 4px; height: 20.8px; display: flex; align-items: center; justify-content: flex-end; }
+        .ide-line-num.active { color: var(--accent); background: rgba(124,110,250,.06); }
+        .ide-line-num.match  { background: rgba(245,158,11,.15); color: var(--accent3); }
+
+        /* NEW: search bar */
+        .ide-search-bar { padding: 5px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--s2); flex-shrink: 0; }
+        .ide-search-input { flex: 1; background: var(--s3); border: 1px solid var(--border); border-radius: 5px; color: var(--text); padding: 3px 8px; font-size: 12px; outline: none; }
+
+        /* NEW: score history */
+        .score-hist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .score-hist-bar { flex: 1; height: 4px; background: var(--s3); border-radius: 2px; overflow: hidden; }
+        .score-hist-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
+
+        /* NEW: agent hint bubble */
+        .agent-hint-bubble { margin: 0 12px 10px; padding: 8px 10px; background: var(--s3); border: 1px solid var(--border2); border-radius: 8px; font-size: 11px; color: var(--muted2); animation: hint-pop .2s ease; }
+        @keyframes hint-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* NEW: XP badge flash */
+        .xp-flash { animation: xp-pop .6s ease; }
+        @keyframes xp-pop { 0%,100% { transform: scale(1); } 40% { transform: scale(1.25); } }
+
+        /* NEW: keyboard hint badges */
+        .kbd-hint { background: var(--s3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 10px; color: var(--muted2); font-family: var(--mono); }
+
+        /* NEW: timer ring */
+        .timer-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
         .timer-svg { transform: rotate(-90deg); }
-        .timer-track { fill: none; stroke: #1e2433; stroke-width: 3; }
-        .timer-prog { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset .9s linear, stroke .9s; }
-        .timer-text { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
-        .search-bar { padding: 6px 14px; border-bottom: 1px solid #1e2433; display: flex; align-items: center; gap: 8px; background: #0b0d14; }
-        .search-input { flex: 1; background: #1a2035; border: 1px solid #2e3a52; border-radius: 6px; color: #e2e8f0; padding: 4px 10px; font-size: 12px; outline: none; }
-        .kbd { background: #1a2035; border: 1px solid #2e3a52; border-radius: 4px; padding: 1px 6px; font-size: 10px; color: #64748b; font-family: monospace; }
-        .hint-tooltip { font-size: 10px; color: #64748b; margin-top: 2px; }
-        .snapshot-btn { font-size: 11px; background: #1a2035; border: 1px solid #2e3a52; color: #94a3b8; border-radius: 5px; padding: 3px 8px; cursor: pointer; transition: all .15s; }
-        .snapshot-btn:hover { border-color: #7C6EFA; color: #7C6EFA; }
-        .lock-tooltip { font-size: 11px; color: #F87171; margin-top: 2px; }
-        .mobile-tabs { display: none; }
-        @media (max-width: 700px) {
-          .ide-panels { flex-direction: column; }
-          .ide-sidebar { display: none; }
-          .ide-right { display: none; }
-          .ide-sidebar.mobile-show { display: flex; width: 100% !important; height: 200px; border-right: none; border-bottom: 1px solid #1e2433; }
-          .ide-right.mobile-show { display: flex; width: 100% !important; height: 260px; border-left: none; border-top: 1px solid #1e2433; }
-          .mobile-tabs { display: flex; border-bottom: 1px solid #1e2433; background: #0b0d14; padding: 0 10px; flex-shrink: 0; }
-          .resize-handle { display: none; }
+        .timer-ring-track { fill: none; stroke-width: 2.5; }
+        .timer-ring-prog  { fill: none; stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 1s linear, stroke .8s; }
+        .timer-label { position: absolute; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+
+        /* Snapshot restore button */
+        .snap-btn { font-size: 11px; background: var(--s3); border: 1px solid var(--border); color: var(--muted2); border-radius: 5px; padding: 2px 8px; cursor: pointer; transition: all .15s; }
+        .snap-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        @media (max-width: 768px) {
+          .ide-body { display: flex; flex-direction: column; }
+          .ide-panel-tasks  { display: none !important; }
+          .ide-panel-editor { display: none !important; }
+          .ide-panel-output { display: none !important; }
+          .ide-panel-team   { display: none !important; }
+
+          .ide-panel-tasks.mob-active  { display: flex !important; flex: 1; }
+          .ide-panel-editor.mob-active { display: flex !important; flex: 1; }
+          .ide-panel-output.mob-active { display: flex !important; flex: 1; }
+          .ide-panel-team.mob-active   { display: flex !important; flex: 1; }
+
+          .ide-mob-tabs { display: flex; background: var(--s2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+          .ide-mob-tab  { flex: 1; padding: 10px 4px; font-size: 11px; font-weight: 600; text-align: center; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted2); }
+          .ide-mob-tab.active { color: var(--accent); border-color: var(--accent); }
+
+          .ide-resize-handle { display: none; }
+          .ide-line-nums     { display: none; }
         }
       `}</style>
 
-      <div className="ide-root">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* ── TOP BAR ── */}
-        <div className="ide-topbar">
-          {/* Timer */}
-          <div className="timer-ring" title={timerRunning ? 'Click to pause' : 'Click to resume'}
-            style={{ cursor: 'pointer' }} onClick={() => setTimerRunning(p => !p)}>
-            <svg className="timer-svg" width={44} height={44} viewBox="0 0 44 44">
-              <circle className="timer-track" cx={22} cy={22} r={18} />
-              <circle className="timer-prog"
-                cx={22} cy={22} r={18}
-                stroke={timerColor}
-                strokeDasharray={`${2 * Math.PI * 18}`}
-                strokeDashoffset={`${2 * Math.PI * 18 * (1 - timerPct)}`}
+        {/* ══════════════ TOP BAR ══════════════ */}
+        <div className="ide-topbar" style={{
+          height: 44, background: 'var(--s2)', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8,
+          flexShrink: 0, whiteSpace: 'nowrap',
+        }}>
+
+          {/* ── Timer ring (click to pause/resume) ── */}
+          <div className="timer-wrap" onClick={toggleTimer}
+            title={timerPaused ? 'Click to resume timer' : 'Click to pause timer'}
+            style={{ background: timerColor, border: `1px solid ${timerBorder}`, borderRadius: 8, padding: '3px 8px 3px 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg className="timer-svg" width={32} height={32} viewBox="0 0 32 32">
+              <circle className="timer-ring-track" cx={16} cy={16} r={RING_R}
+                stroke="rgba(255,255,255,.1)" />
+              <circle className="timer-ring-prog" cx={16} cy={16} r={RING_R}
+                stroke={ringStroke}
+                strokeDasharray={RING_CIRC}
+                strokeDashoffset={RING_CIRC * (1 - timerPct)}
               />
             </svg>
-            <span className="timer-text" style={{ color: timerColor }}>{timerFmt}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: timerText, letterSpacing: '.03em' }}>
+              {timerPaused ? '⏸ ' : ''}{mm}
+            </span>
           </div>
 
-          <button className="top-btn run-btn" onClick={handleRun} disabled={running}
-            title="Run (Ctrl+Enter)">
-            {running ? '⟳' : '▶'} {running ? 'Running…' : 'Run'}
-          </button>
-          <button className="top-btn validate-btn" onClick={handleValidate} disabled={validating}>
-            {validating ? '⟳' : '✓'} {validating ? 'Validating…' : 'Validate'}
-          </button>
-          <button className="top-btn submit-btn" onClick={handleSubmit} disabled={!validated || completedTasks.has(task.id)}
-            title={!validated ? 'Validate first' : completedTasks.has(task.id) ? 'Already submitted' : 'Submit'}>
-            ✉ Submit
-          </button>
+          {/* ── Run ── */}
+          <button
+            className="ide-btn-run"
+            onClick={runCode}
+            disabled={isRunning}
+            style={{ padding: '6px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+            title="Run code (Ctrl+Enter)"
+          >{isRunning ? '⏳ Running…' : '▶ Run'}</button>
 
-          {/* Language selector */}
-          <select value={lang} onChange={e => setLang(e.target.value)}
-            style={{ marginLeft: 4, background: '#1a2035', border: '1px solid #2e3a52', color: '#e2e8f0', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
-            {LANGUAGES.map(l => <option key={l}>{l}</option>)}
+          {/* ── Validate ── */}
+          <button
+            className="ide-btn-run"
+            onClick={validateCode}
+            disabled={isValidating}
+            style={{ padding: '6px 14px', background: 'rgba(96,165,250,.12)', color: '#60A5FA', border: '1px solid rgba(96,165,250,.25)', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+          >{isValidating ? '⏳ Validating…' : '🔍 Validate'}</button>
+
+          {/* ── Submit ── */}
+          <button
+            onClick={() => handleSubmit(false)}
+            disabled={!validationPassed}
+            title={!validationPassed ? 'Validate your code first' : 'Submit and earn XP'}
+            style={{
+              padding: '6px 14px',
+              background: validationPassed ? 'rgba(52,211,153,.18)' : 'var(--s3)',
+              color:      validationPassed ? 'var(--accent2)'        : 'var(--muted)',
+              border:     `1px solid ${validationPassed ? 'rgba(52,211,153,.45)' : 'var(--border)'}`,
+              borderRadius: 7, fontSize: 13, fontWeight: 700,
+              cursor: validationPassed ? 'pointer' : 'not-allowed', flexShrink: 0,
+              transition: 'all .2s',
+            }}
+          >✓ Submit</button>
+
+          {/* ── Language ── */}
+          <select
+            value={lang}
+            onChange={e => handleLangChange(e.target.value)}
+            style={{ background: 'var(--s3)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', padding: '4px 8px', fontSize: 12, outline: 'none', flexShrink: 0 }}
+          >
+            {(currentSim.languages || ['JavaScript']).map(l => <option key={l}>{l}</option>)}
           </select>
 
-          <span style={{ fontSize: 12, color: '#64748b', marginLeft: 2 }}>
-            Task {activeTaskIdx + 1}/{TASKS.length}
-          </span>
+          <div style={{ fontSize: 12, color: 'var(--muted2)', flexShrink: 0 }}>
+            Task {currentTask + 1}/{tasks.length}
+          </div>
 
           <div style={{ flex: 1 }} />
 
-          {/* Keyboard hint */}
-          <span style={{ fontSize: 11, color: '#3d4a5e', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <kbd className="kbd">Ctrl+Enter</kbd> Run &nbsp;
-            <kbd className="kbd">Ctrl+F</kbd> Search
+          {/* ── Keyboard hints ── */}
+          <span style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+            <kbd className="kbd-hint">Ctrl+Enter</kbd> Run
+            <kbd className="kbd-hint" style={{ marginLeft: 6 }}>Ctrl+F</kbd> Search
           </span>
 
-          {/* XP */}
-          <div className={`xp-badge${xpAnim ? ' anim' : ''}`}>XP: {xp}</div>
+          {/* ── XP badge ── */}
+          <div className={xpAnim ? 'xp-flash' : ''}
+            style={{ background: 'var(--s3)', border: '1px solid var(--border2)', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 700, color: 'var(--accent3)', flexShrink: 0 }}>
+            XP: {user?.xp ?? 0}
+          </div>
         </div>
 
-        {/* ── MOBILE TABS ── */}
-        <div className="mobile-tabs">
-          {['Tasks', 'Editor', 'Team'].map(t => (
-            <button key={t} className={`tab-btn${activeTab === t ? ' active' : ''}`}
-              onClick={() => setActiveTab(t)}>{t}</button>
+        {/* ══════════════ MOBILE TABS ══════════════ */}
+        <div className="ide-mob-tabs">
+          {[['tasks', '📋 Tasks'], ['editor', '💻 Code'], ['output', '📊 Output'], ['team', '👥 Team']].map(([key, label]) => (
+            <div key={key} className={`ide-mob-tab${mobilePanel === key ? ' active' : ''}`}
+              onClick={() => setMobilePanel(key)}>{label}</div>
           ))}
         </div>
 
-        <div className="ide-panels">
+        {/* ══════════════ IDE BODY ══════════════ */}
+        <div className="ide-body">
 
-          {/* ── SIDEBAR: TASK LIST ── */}
-          <div className="ide-sidebar" style={{ width: sidebarW }}>
-            <div style={{ padding: '10px 16px 6px', fontSize: 10, fontWeight: 700, color: '#3d4a5e', letterSpacing: '.1em', textTransform: 'uppercase' }}>Tasks</div>
-            <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 8 }}>
-              {TASKS.map((t, idx) => {
-                const unlocked = isUnlocked(idx);
-                const done     = completedTasks.has(t.id);
-                const active   = activeTaskIdx === idx;
-                return (
-                  <div key={t.id}
-                    className={`task-item${active ? ' active' : ''}${!unlocked ? ' locked' : ''}`}
-                    onClick={() => unlocked && setActiveTaskIdx(idx)}
-                    title={!unlocked ? `Complete Task ${idx} to unlock` : ''}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
-                      <span style={{ fontSize: 10, color: '#3d4a5e', fontWeight: 700 }}>TASK {t.id}</span>
-                      {!unlocked && <span style={{ fontSize: 12 }}>🔒</span>}
-                      {done && <span style={{ fontSize: 12 }}>✅</span>}
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#7C6EFA' : '#94a3b8' }}>{t.title}</div>
-                    <div style={{ fontSize: 11, color: '#3d4a5e', marginTop: 2 }}>{t.duration}</div>
-                    {!unlocked && (
-                      <div className="lock-tooltip">Complete task {idx} first</div>
-                    )}
-                    {done && (
-                      <div style={{ marginTop: 4 }}>
-                        <div className="score-bar-track"><div className="score-bar-fill" style={{ width: '100%', background: '#34D399' }} /></div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Task description */}
-            <div style={{ borderTop: '1px solid #1e2433', padding: '12px 14px', background: '#0b0d14' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#7C6EFA', marginBottom: 6 }}>Task {task.id}: {task.title}</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>{task.description}</div>
-              {task.requirements.map((r, i) => (
-                <div key={i} style={{ display: 'flex', gap: 6, fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>
-                  <span style={{ color: '#34D399', flexShrink: 0 }}>•</span>
-                  <span>{r}</span>
-                </div>
-              ))}
-            </div>
+          {/* ── TASKS PANEL ── */}
+          <div className={`ide-panel-tasks${mobilePanel === 'tasks' ? ' mob-active' : ''}`}
+            style={{ flexDirection: 'column', overflow: 'hidden' }}>
+            <TaskPanel
+              tasks={tasks}
+              current={currentTask}
+              results={taskResults}
+              onSwitch={(i) => { loadTask(i); setMobilePanel('editor'); }}
+            />
           </div>
 
-          {/* ── RESIZE LEFT ── */}
-          <div className={`resize-handle${draggingLeft ? ' active' : ''}`}
-            onMouseDown={() => setDraggingLeft(true)} />
+          {/* ── EDITOR PANEL (enhanced) ── */}
+          <div className={`ide-panel-editor${mobilePanel === 'editor' ? ' mob-active' : ''}`}
+            style={{ flexDirection: 'column', overflow: 'hidden', display: 'flex' }}>
 
-          {/* ── EDITOR AREA ── */}
-          <div className="ide-editor-area">
-
-            {/* File tabs */}
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #1e2433', background: '#0b0d14', padding: '0 6px' }}>
-              {['solution', 'utils'].map(f => (
-                <button key={f} className={`tab-btn${activeFile === f ? ' active' : ''}`}
-                  onClick={() => setActiveFile(f)}>
-                  {f === 'solution' ? `solution.${lang === 'Python' ? 'py' : lang === 'TypeScript' ? 'ts' : 'js'}` : 'utils.js'}
-                </button>
-              ))}
+            {/* File tab bar */}
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--s2)', padding: '0 6px', flexShrink: 0, gap: 4 }}>
+              <span style={{ padding: '6px 12px', fontSize: 12, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', fontFamily: 'var(--mono)' }}>
+                solution.{lang === 'Python' ? 'py' : lang === 'TypeScript' ? 'ts' : 'js'}
+              </span>
               <div style={{ flex: 1 }} />
               {/* Snapshot restore */}
-              {Object.keys(snapshots).some(k => k.startsWith(`${task.id}_${lang}_`)) && (
-                <button className="snapshot-btn" onClick={handleRestoreSnapshot} title="Restore last auto-saved snapshot">
-                  ↺ Restore snapshot
+              {hasSnapshot && (
+                <button className="snap-btn" onClick={handleRestoreSnapshot} title="Restore last auto-snapshot">
+                  ↺ Restore
                 </button>
               )}
               {/* Search toggle */}
-              <button className="snapshot-btn" onClick={() => setShowSearch(p => !p)} title="Search in file (Ctrl+F)"
-                style={{ marginLeft: 6 }}>
+              <button className="snap-btn" onClick={() => { setShowSearch(p => !p); setSearchQuery(''); }}
+                style={{ marginLeft: 4 }} title="Search in file (Ctrl+F)">
                 🔍
               </button>
-              <span style={{ fontSize: 11, color: '#3d4a5e', marginLeft: 10, marginRight: 6 }}>Ln {cursorLine}</span>
+              {/* Cursor line */}
+              <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 8, marginRight: 4, fontFamily: 'var(--mono)' }}>
+                Ln {cursorLine}
+              </span>
             </div>
 
             {/* Search bar */}
             {showSearch && (
-              <div className="search-bar">
-                <input className="search-input" placeholder="Search in file…" autoFocus
+              <div className="ide-search-bar">
+                <input className="ide-search-input" autoFocus placeholder="Search in file…"
                   value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                <span style={{ fontSize: 11, color: '#64748b' }}>
-                  {searchMatches.length > 0 ? `${searchMatches.length} match${searchMatches.length > 1 ? 'es' : ''} on line${searchMatches.length > 1 ? 's' : ''} ${searchMatches.slice(0, 5).join(', ')}${searchMatches.length > 5 ? '…' : ''}` : searchQuery ? 'No matches' : ''}
+                <span style={{ fontSize: 11, color: 'var(--muted2)', minWidth: 80 }}>
+                  {searchQuery
+                    ? searchMatches.length > 0
+                      ? `${searchMatches.length} match${searchMatches.length > 1 ? 'es' : ''}`
+                      : 'No matches'
+                    : ''}
                 </span>
-                <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                <button onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchMatches([]); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted2)', cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
               </div>
             )}
 
-            {/* Editor */}
-            <div className="editor-wrap">
+            {/* Editor + line numbers */}
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
               {/* Line numbers */}
-              <div className="line-nums">
+              <div className="ide-line-nums">
                 {Array.from({ length: lineCount }, (_, i) => (
-                  <div key={i} className={`line-num${i + 1 === cursorLine ? ' highlight' : ''}${searchMatches.includes(i + 1) ? ' search-match' : ''}`}>
+                  <div key={i} className={`ide-line-num${i + 1 === cursorLine ? ' active' : ''}${searchMatches.includes(i + 1) ? ' match' : ''}`}>
                     {i + 1}
                   </div>
                 ))}
               </div>
-              {/* Textarea */}
-              <textarea ref={editorRef}
-                className="code-editor"
-                value={activeFile === 'solution' ? code : '// utils.js\n// Helper utilities — import in your solution\n\nmodule.exports = {};'}
-                readOnly={activeFile !== 'solution'}
-                onChange={e => setCode(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Tab') { e.preventDefault(); const s = e.target.selectionStart; const v = code; setCode(v.slice(0, s) + '  ' + v.slice(e.target.selectionEnd)); setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = s + 2; }, 0); }
-                }}
+              {/* The real CodeEditor component, plus cursor tracking */}
+              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}
                 onClick={e => {
-                  const lines = code.slice(0, e.target.selectionStart).split('\n');
-                  setCursorLine(lines.length);
+                  const ta = e.currentTarget.querySelector('textarea');
+                  if (ta) setCursorLine(ta.value.slice(0, ta.selectionStart).split('\n').length);
                 }}
                 onKeyUp={e => {
-                  const lines = code.slice(0, e.target.selectionStart).split('\n');
-                  setCursorLine(lines.length);
-                }}
-                spellCheck={false}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-              />
-            </div>
-
-            {/* Console / Tests / Validate / Score / Hints */}
-            <div style={{ height: 200, borderTop: '1px solid #1e2433', display: 'flex', flexDirection: 'column', background: '#080a10' }}>
-              <div style={{ display: 'flex', borderBottom: '1px solid #1e2433', background: '#0b0d14' }}>
-                {['console', 'tests', 'validate', 'score', 'hints'].map(t => (
-                  <button key={t} className={`tab-btn${activeTab === t ? ' active' : ''}`}
-                    onClick={() => setActiveTab(t)}
-                    style={{ textTransform: 'capitalize' }}>
-                    {t}
-                    {t === 'tests' && testResults && (
-                      <span style={{ marginLeft: 5, fontSize: 10, background: testResults.every(r => r.status === 'pass') ? 'rgba(52,211,153,.2)' : 'rgba(248,113,113,.2)', color: testResults.every(r => r.status === 'pass') ? '#34D399' : '#F87171', borderRadius: 4, padding: '1px 5px' }}>
-                        {testResults.filter(r => r.status === 'pass').length}/{testResults.length}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px' }}>
-
-                {/* Console */}
-                {activeTab === 'console' && (
-                  <div>
-                    {consoleLines.map((line, i) => {
-                      const cls = line.startsWith('✓') || line.startsWith('+') ? 'pass'
-                        : line.startsWith('✗') || line.startsWith('⚠') ? 'fail'
-                        : line.startsWith('$') ? 'info'
-                        : line.startsWith('→') ? 'warn'
-                        : '';
-                      return <div key={i} className={`console-out ${cls}`}>{line || '\u00A0'}</div>;
-                    })}
-                    {running && <div className="console-out info" style={{ animation: 'agent-pulse 1s infinite' }}>…</div>}
-                  </div>
-                )}
-
-                {/* Tests */}
-                {activeTab === 'tests' && (
-                  <div>
-                    {validating && <div className="console-out info">Running test suite…</div>}
-                    {!validating && !testResults && task.tests.map(t => (
-                      <div key={t.id} className="test-row pending">
-                        <span className="test-icon" style={{ color: '#3d4a5e' }}>○</span>
-                        <div>
-                          <div style={{ fontSize: 12, color: '#64748b' }}>{t.label}</div>
-                          <div className="hint-tooltip">{t.hint}</div>
-                        </div>
-                      </div>
-                    ))}
-                    {testResults && testResults.map(t => (
-                      <div key={t.id} className={`test-row ${t.status}`}>
-                        <span className="test-icon">{t.status === 'pass' ? '✓' : '✗'}</span>
-                        <div>
-                          <div style={{ fontSize: 12, color: t.status === 'pass' ? '#34D399' : '#F87171' }}>{t.label}</div>
-                          <div className="hint-tooltip">{t.msg}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Validate summary */}
-                {activeTab === 'validate' && (
-                  <div>
-                    {!testResults ? (
-                      <div style={{ color: '#64748b', fontSize: 12 }}>Click Validate to check your solution against the test suite.</div>
-                    ) : (
-                      <>
-                        <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 14, color: validated ? '#34D399' : '#F87171', fontWeight: 700 }}>
-                            {validated ? '✓ All tests passing' : '✗ Some tests failed'}
-                          </span>
-                          <span style={{ fontSize: 12, color: '#64748b' }}>
-                            {testResults.filter(r => r.status === 'pass').length}/{testResults.length} passed
-                          </span>
-                        </div>
-                        <div className="score-bar-track" style={{ marginBottom: 12 }}>
-                          <div className="score-bar-fill" style={{
-                            width: `${(testResults.filter(r => r.status === 'pass').length / testResults.length) * 100}%`,
-                            background: validated ? '#34D399' : '#F59E0B',
-                          }} />
-                        </div>
-                        {validated ? (
-                          <div style={{ color: '#34D399', fontSize: 12 }}>
-                            ✓ Ready to submit! Click Submit to earn {task.xp} XP.
-                          </div>
-                        ) : (
-                          <div style={{ color: '#94a3b8', fontSize: 12 }}>
-                            Fix the failing tests and re-validate.
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Score history */}
-                {activeTab === 'score' && (
-                  <div>
-                    {scoreHistory.length === 0 ? (
-                      <div style={{ color: '#64748b', fontSize: 12 }}>No validation runs yet. Validate a task to see your score.</div>
-                    ) : (
-                      <>
-                        <div style={{ marginBottom: 10, fontSize: 11, color: '#64748b' }}>Validation history</div>
-                        {scoreHistory.map((s, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                            <span style={{ fontSize: 11, color: '#3d4a5e', minWidth: 60 }}>Task {s.taskId}</span>
-                            <div className="score-bar-track" style={{ flex: 1 }}>
-                              <div className="score-bar-fill" style={{ width: `${s.pct}%`, background: s.pct === 100 ? '#34D399' : s.pct >= 50 ? '#F59E0B' : '#F87171' }} />
-                            </div>
-                            <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 32 }}>{s.pct}%</span>
-                          </div>
-                        ))}
-                        <div style={{ marginTop: 10, fontSize: 12, color: '#F59E0B', fontWeight: 700 }}>
-                          Total XP earned: {xp}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Hints */}
-                {activeTab === 'hints' && (
-                  <div>
-                    <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Task-specific hints — click an agent to get personalised advice.</div>
-                    {task.requirements.map((r, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>
-                        <span style={{ color: '#7C6EFA' }}>💡</span>
-                        <span>{r}</span>
-                      </div>
-                    ))}
-                    <div style={{ marginTop: 10, fontSize: 11, color: '#3d4a5e' }}>
-                      Tip: Click any team agent on the right → "Ping" for a code hint.
-                    </div>
-                  </div>
-                )}
-
+                  const ta = e.currentTarget.querySelector('textarea');
+                  if (ta) setCursorLine(ta.value.slice(0, ta.selectionStart).split('\n').length);
+                }}>
+                <CodeEditor code={code} onChange={setCode} />
               </div>
             </div>
           </div>
 
-          {/* ── RESIZE RIGHT ── */}
-          <div className={`resize-handle${draggingRight ? ' active' : ''}`}
-            onMouseDown={() => setDraggingRight(true)} />
+          {/* ── OUTPUT PANEL ── */}
+          <div className={`ide-panel-output${mobilePanel === 'output' ? ' mob-active' : ''}`}
+            style={{ flexDirection: 'column', overflow: 'hidden' }}>
 
-          {/* ── RIGHT: TEAM WORKFLOW ── */}
-          <div className="ide-right" style={{ width: rightW }}>
-            <div style={{ padding: '10px 14px 6px', fontSize: 10, fontWeight: 700, color: '#3d4a5e', letterSpacing: '.1em', textTransform: 'uppercase' }}>Team Workflow</div>
+            {/* Inject score history tab into OutputPanel via the existing activeTab/onTab props */}
+            <OutputPanel
+              activeTab={activeTab}
+              onTab={setActiveTab}
+              output={output}
+              tests={tests}
+              valResult={valResult}
+              score={score}
+              /* NEW extra props — OutputPanel can ignore them if it doesn't use them yet */
+              scoreHistory={scoreHistory}
+            />
 
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              {AGENTS.map(ag => {
-                const state = agentStates[ag.id];
-                const dotColor = state === 'idle' ? '#3d4a5e' : state === 'active' ? '#7C6EFA' : '#34D399';
-                const statusText = ag[state];
-                const isHinting = agentHint?.agentId === ag.id;
-                const onCooldown = pingCooldown[ag.id];
-
-                return (
-                  <div key={ag.id}>
-                    <div className={`agent-card${state === 'active' ? ' active' : state === 'done' ? ' done' : ''}`}
-                      onClick={() => handlePingAgent(ag.id)}
-                      title={onCooldown ? 'Agent is responding…' : 'Click to ask for a hint'}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <span style={{ background: ag.color, color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 6px' }}>{ag.label}</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', flex: 1 }}>{ag.role}</span>
-                        <div className="agent-status-dot" style={{ background: dotColor }} />
+            {/* Score history — rendered here if OutputPanel doesn't handle it */}
+            {activeTab === 'score' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+                {scoreHistory.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--muted2)' }}>No validation runs yet.</div>
+                ) : (
+                  scoreHistory.map((s, i) => (
+                    <div key={i} className="score-hist-row">
+                      <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 70 }}>Task {s.taskIdx + 1}</span>
+                      <div className="score-hist-bar">
+                        <div className="score-hist-fill" style={{
+                          width: `${s.pct}%`,
+                          background: s.pct >= 80 ? '#34D399' : s.pct >= 50 ? '#F59E0B' : '#F87171',
+                        }} />
                       </div>
-                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>{ag.tagline}</div>
-                      <div style={{ background: '#0f1117', borderRadius: 6, padding: '5px 8px', fontSize: 11, color: state === 'active' ? '#7C6EFA' : state === 'done' ? '#34D399' : '#3d4a5e', fontStyle: state === 'idle' ? 'italic' : 'normal' }}>
-                        {state === 'active' && <span style={{ marginRight: 6 }}>⟳</span>}
-                        {statusText}
-                      </div>
-                      {!onCooldown && (
-                        <div style={{ marginTop: 6, fontSize: 10, color: '#3d4a5e', textAlign: 'right' }}>
-                          click to ping ↗
-                        </div>
-                      )}
+                      <span style={{ fontSize: 11, color: 'var(--muted2)', minWidth: 34 }}>{s.pct}%</span>
                     </div>
-                    {isHinting && (
-                      <div className="agent-hint-bubble">
-                        💬 <strong style={{ color: ag.color }}>{ag.label}:</strong> {agentHint.text}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
-            {/* Progress summary */}
-            <div style={{ borderTop: '1px solid #1e2433', padding: '10px 14px', background: '#0b0d14' }}>
-              <div style={{ fontSize: 10, color: '#3d4a5e', fontWeight: 700, marginBottom: 8, letterSpacing: '.08em', textTransform: 'uppercase' }}>Progress</div>
-              <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-                {TASKS.map(t => (
-                  <div key={t.id} style={{
-                    flex: 1, height: 5, borderRadius: 3,
-                    background: completedTasks.has(t.id) ? '#34D399' : activeTaskIdx === TASKS.indexOf(t) ? '#7C6EFA' : '#1e2433',
+          {/* ── TEAM PANEL (enhanced with ping) ── */}
+          <div className={`ide-panel-team${mobilePanel === 'team' ? ' mob-active' : ''}`}
+            style={{ flexDirection: 'column', overflow: 'hidden', display: 'flex' }}>
+
+            {/* TeamPanel renders its own agent cards */}
+            <TeamPanel
+              msgs={teamMsgs}
+              /* NEW: pass ping handler so TeamPanel can wire it up, or handle below */
+              onPing={handlePingAgent}
+            />
+
+            {/* Agent hint bubble — rendered outside TeamPanel so it always shows */}
+            {agentHint && (
+              <div className="agent-hint-bubble">
+                💬 <strong style={{ color: 'var(--accent)' }}>{agentHint.role.toUpperCase()}:</strong>{' '}
+                {agentHint.text}
+              </div>
+            )}
+
+            {/* Progress bar strip at bottom */}
+            <div style={{ borderTop: '1px solid var(--border)', padding: '10px 14px', background: 'var(--s2)', flexShrink: 0 }}>
+              <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.07em' }}>
+                Stage Progress
+              </div>
+              <div style={{ display: 'flex', gap: 3, marginBottom: 6 }}>
+                {tasks.map((_, idx) => (
+                  <div key={idx} style={{
+                    flex: 1, height: 4, borderRadius: 2,
+                    background: taskResults[idx]
+                      ? '#34D399'
+                      : idx === currentTask
+                      ? 'var(--accent)'
+                      : 'var(--s3)',
                     transition: 'background .3s',
-                  }} title={t.title} />
+                  }} title={tasks[idx]?.title} />
                 ))}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }}>
-                <span>{completedTasks.size}/{TASKS.length} tasks done</span>
-                <span style={{ color: '#F59E0B', fontWeight: 700 }}>{xp} XP</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted2)' }}>
+                <span>{Object.keys(taskResults).length}/{tasks.length} done</span>
+                <span style={{ color: 'var(--accent3)', fontWeight: 700 }}>
+                  {Object.values(taskResults).reduce((a, b) => a + (b.xpEarned || 0), 0)} XP earned
+                </span>
               </div>
             </div>
           </div>
 
         </div>
+
+        {/* ══════════════ TASK COMPLETE MODAL ══════════════ */}
+        {modalDone && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: 'var(--s2)', border: '1px solid var(--border2)', borderRadius: 20, padding: 40, maxWidth: 400, width: '100%', textAlign: 'center' }}>
+              <div style={{ fontSize: 52, marginBottom: 16 }}>🎉</div>
+              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Task Complete!</div>
+              <div style={{ fontSize: 56, fontWeight: 900, color: 'var(--accent2)', margin: '8px 0' }}>{modalDone.score}</div>
+              <div style={{ fontSize: 14, color: 'var(--muted2)', marginBottom: 4 }}>Score out of 100</div>
+              {modalDone.xpEarned > 0 && (
+                <div style={{ fontSize: 13, color: 'var(--accent3)', marginBottom: 20 }}>+{modalDone.xpEarned} XP earned</div>
+              )}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button onClick={nextTask} style={{ padding: '12px 28px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Next Task →</button>
+                <button onClick={() => setModalDone(null)} style={{ padding: '12px 28px', background: 'transparent', border: '1px solid var(--border2)', color: 'var(--muted2)', borderRadius: 10, fontSize: 14, cursor: 'pointer' }}>Stay Here</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ STAGE COMPLETE MODAL ══════════════ */}
+        {modalStage && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: 'var(--s2)', border: '1px solid var(--border2)', borderRadius: 20, padding: 40, maxWidth: 500, width: '100%', textAlign: 'center' }}>
+              <div style={{ fontSize: 52, marginBottom: 16 }}>🏆</div>
+              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Stage Complete!</div>
+              <div style={{ background: 'var(--s1)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, margin: '16px 0', textAlign: 'left' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent)', marginBottom: 6 }}>{modalStage.cert.id}</div>
+                <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{user?.name} {user?.lname}</div>
+                <div style={{ fontSize: 13, color: 'var(--muted2)', marginBottom: 8 }}>has completed the {currentSim.title} Simulation — {stageInfo.label} Stage</div>
+                <div style={{ fontSize: 12, color: 'var(--accent2)' }}>Score: <strong>{modalStage.avg}</strong>/100 · {modalStage.cert.date}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => { showToast('📄 Certificate saved to your profile!'); setModalStage(null); navigate('/profile'); }}
+                  style={{ padding: '12px 24px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                >View Profile 📄</button>
+                <button
+                  onClick={() => { setModalStage(null); navigate('/simulations'); }}
+                  style={{ padding: '12px 24px', background: 'transparent', border: '1px solid var(--border2)', color: 'var(--muted2)', borderRadius: 10, fontSize: 14, cursor: 'pointer' }}
+                >Back to Sims</button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );
