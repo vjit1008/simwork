@@ -8,8 +8,11 @@ export default function ForgotPassword() {
   const [message, setMessage] = useState('');
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!email.trim()) return;
+  e.preventDefault();
+  if (!email.trim()) {
+    setMessage('Please enter your email address.');
+    setStatus('error');
+    return;
     setStatus('loading');
     try {
       const res = await API.post('/api/auth/forgot-password', { email });
