@@ -131,8 +131,16 @@ export default function IDEPage() {
 
   /* ── editor state ── */
   const [code, setCode]           = useState('');
-  const [snapshots, setSnapshots] = useState({});  // NEW: per-task snapshots
-  const [cursorLine, setCursorLine] = useState(1); // NEW: line tracker
+  const [snapshots, setSnapshots] = useState({});
+  const [cursorLine, setCursorLine] = useState(1);
+
+  /* ── seed code whenever task or language changes ── */
+  useEffect(() => {
+    if (task && code.trim().length === 0) {
+      const starter = getStarterCodeForLanguage(task, lang);
+      if (starter) setCode(starter);
+    }
+  }, [task, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── output / test state ── */
   const [output, setOutput]       = useState([
@@ -200,7 +208,8 @@ export default function IDEPage() {
     const t = tasks[idx];
     if (!t) return;
     setCurrentTask(idx);
-    setCode(getStarterCodeForLanguage(t, lang));
+    const starter = getStarterCodeForLanguage(t, lang);
+    setCode(starter || '// Write your solution here\n');
     setValidationPassed(false);
     setOutput([
       { type: 'info',  text: '$ SimWork IDE ready' },
@@ -251,6 +260,12 @@ export default function IDEPage() {
   useEffect(() => {
     if (!currentSim) { navigate('/simulations'); return; }
     loadTask(currentTask);
+    // Direct fallback: if tasks are available right now, seed code immediately
+    const t = tasks[currentTask];
+    if (t) {
+      const starter = getStarterCodeForLanguage(t, lang);
+      if (starter) setCode(starter);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSim, currentStage]);
 
@@ -261,7 +276,8 @@ export default function IDEPage() {
     setLang(newLang);
     if (user) update({ preferredLanguage: newLang });
     if (task) {
-      setCode(getStarterCodeForLanguage(task, newLang));
+      const starter = getStarterCodeForLanguage(task, newLang);
+      setCode(starter || `// Write your ${newLang} solution here\n`);
       setValidationPassed(false);
       setScore(0);
       setValResult(null);
