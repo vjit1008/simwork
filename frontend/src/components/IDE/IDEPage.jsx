@@ -632,8 +632,6 @@ Respond in this EXACT JSON format only, no other text:
   const timerBorder = timerSec > 300 ? 'rgba(52,211,153,.2)'  : timerSec > 60 ? 'rgba(245,158,11,.2)'  : 'rgba(248,113,113,.2)';
   const timerText   = timerSec > 300 ? 'var(--accent2)'        : timerSec > 60 ? 'var(--accent3)'        : 'var(--rose)';
   const ringStroke  = timerSec > 300 ? '#34D399'               : timerSec > 60 ? '#F59E0B'               : '#F87171';
-  const RING_R      = 14;
-  const RING_CIRC   = 2 * Math.PI * RING_R;
 
   if (!currentSim || !task) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexDirection: 'column', gap: 12 }}>
@@ -643,7 +641,6 @@ Respond in this EXACT JSON format only, no other text:
   );
 
   /* ── derived ── */
-  const lineCount = code.split('\n').length;
   const hasSnapshot = !!snapshots[`${currentTask}_${lang}`];
 
   return (
@@ -733,19 +730,39 @@ Respond in this EXACT JSON format only, no other text:
           {/* ── Timer ring (click to pause/resume) ── */}
           <div className="timer-wrap" onClick={toggleTimer}
             title={timerPaused ? 'Click to resume timer' : 'Click to pause timer'}
-            style={{ background: timerColor, border: `1px solid ${timerBorder}`, borderRadius: 8, padding: '3px 8px 3px 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg className="timer-svg" width={32} height={32} viewBox="0 0 32 32">
-              <circle className="timer-ring-track" cx={16} cy={16} r={RING_R}
-                stroke="rgba(255,255,255,.1)" />
-              <circle className="timer-ring-prog" cx={16} cy={16} r={RING_R}
-                stroke={ringStroke}
-                strokeDasharray={RING_CIRC}
-                strokeDashoffset={RING_CIRC * (1 - timerPct)}
-              />
-            </svg>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: timerText, letterSpacing: '.03em' }}>
-              {timerPaused ? '⏸ ' : ''}{mm}
-            </span>
+            style={{
+              background: timerColor, border: `1px solid ${timerBorder}`,
+              borderRadius: 8, padding: '4px 10px 4px 6px',
+              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+            }}>
+            {/* Ring — fixed size, no absolute children inside */}
+            <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
+              <svg width={28} height={28} viewBox="0 0 28 28"
+                style={{ transform: 'rotate(-90deg)', display: 'block' }}>
+                <circle cx={14} cy={14} r={11}
+                  fill="none" stroke="rgba(255,255,255,.1)" strokeWidth={2.5} />
+                <circle cx={14} cy={14} r={11}
+                  fill="none" stroke={ringStroke} strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 11}
+                  strokeDashoffset={2 * Math.PI * 11 * (1 - timerPct)}
+                  style={{ transition: 'stroke-dashoffset 1s linear, stroke .8s' }}
+                />
+              </svg>
+              {/* Pause icon centred inside ring */}
+              {timerPaused && (
+                <span style={{
+                  position: 'absolute', inset: 0, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, color: timerText,
+                }}>⏸</span>
+              )}
+            </div>
+            {/* Time text — beside ring, not inside SVG */}
+            <span style={{
+              fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700,
+              color: timerText, letterSpacing: '.04em', lineHeight: 1,
+            }}>{mm}</span>
           </div>
 
           {/* ── Run ── */}
@@ -835,30 +852,33 @@ Respond in this EXACT JSON format only, no other text:
           <div className={`ide-panel-editor${mobilePanel === 'editor' ? ' mob-active' : ''}`}
             style={{ flexDirection: 'column', overflow: 'hidden', display: 'flex' }}>
 
-            {/* File tab bar */}
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', background: 'var(--s2)', padding: '0 6px', flexShrink: 0, gap: 4 }}>
-              <span style={{ padding: '6px 12px', fontSize: 12, color: 'var(--accent)', borderBottom: '2px solid var(--accent)', fontFamily: 'var(--mono)' }}>
-                solution.{lang === 'Python' ? 'py' : lang === 'TypeScript' ? 'ts' : 'js'}
-              </span>
-              <div style={{ flex: 1 }} />
-              {/* Snapshot restore */}
+            {/* ── Toolbar row sits ABOVE CodeEditor (which has its own file tabs below) ── */}
+            <div style={{
+              display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)',
+              background: 'var(--s2)', padding: '4px 10px', flexShrink: 0, gap: 6,
+            }}>
+              {/* Search toggle */}
+              <button className="snap-btn" onClick={() => { setShowSearch(p => !p); setSearchQuery(''); }}
+                title="Search in file (Ctrl+F)" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                🔍 <span style={{ fontSize: 10 }}>Search</span>
+              </button>
+
+              {/* Snapshot restore — only when available */}
               {hasSnapshot && (
                 <button className="snap-btn" onClick={handleRestoreSnapshot} title="Restore last auto-snapshot">
                   ↺ Restore
                 </button>
               )}
-              {/* Search toggle */}
-              <button className="snap-btn" onClick={() => { setShowSearch(p => !p); setSearchQuery(''); }}
-                style={{ marginLeft: 4 }} title="Search in file (Ctrl+F)">
-                🔍
-              </button>
-              {/* Cursor line */}
-              <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 8, marginRight: 4, fontFamily: 'var(--mono)' }}>
+
+              <div style={{ flex: 1 }} />
+
+              {/* Cursor position */}
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--mono)' }}>
                 Ln {cursorLine}
               </span>
             </div>
 
-            {/* Search bar */}
+            {/* Search bar (collapsible) */}
             {showSearch && (
               <div className="ide-search-bar">
                 <input className="ide-search-input" autoFocus placeholder="Search in file…"
@@ -875,36 +895,37 @@ Respond in this EXACT JSON format only, no other text:
               </div>
             )}
 
-            {/* Editor + line numbers */}
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-              {/* Line numbers */}
-              <div className="ide-line-nums">
-                {Array.from({ length: lineCount }, (_, i) => (
-                  <div key={i} className={`ide-line-num${i + 1 === cursorLine ? ' active' : ''}${searchMatches.includes(i + 1) ? ' match' : ''}`}>
-                    {i + 1}
-                  </div>
-                ))}
-              </div>
-              {/* The real CodeEditor component, plus cursor tracking */}
-              <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}
-                onClick={e => {
-                  const ta = e.currentTarget.querySelector('textarea');
-                  if (ta) setCursorLine(ta.value.slice(0, ta.selectionStart).split('\n').length);
-                }}
-                onKeyUp={e => {
-                  const ta = e.currentTarget.querySelector('textarea');
-                  if (ta) setCursorLine(ta.value.slice(0, ta.selectionStart).split('\n').length);
+            {/* CodeEditor + cursor/search line tracking */}
+            <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}
+              onClick={e => {
+                const ta = e.currentTarget.querySelector('textarea');
+                if (ta) setCursorLine(ta.value.slice(0, ta.selectionStart).split('\n').length);
+              }}
+              onKeyUp={e => {
+                const ta = e.currentTarget.querySelector('textarea');
+                if (ta) setCursorLine(ta.value.slice(0, ta.selectionStart).split('\n').length);
+              }}>
+              <CodeEditor code={code} onChange={setCode} />
+
+              {/* Search match highlight overlay labels — shown as gutter markers */}
+              {searchMatches.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, pointerEvents: 'none',
+                  fontSize: 10, color: '#F59E0B', padding: '4px 4px 0',
+                  lineHeight: 1.6, fontFamily: 'var(--mono)',
                 }}>
-                <CodeEditor code={code} onChange={setCode} />
-              </div>
+                  {searchMatches.slice(0, 8).map(ln => (
+                    <div key={ln} style={{ opacity: .7 }}>L{ln}</div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           {/* ── OUTPUT PANEL ── */}
           <div className={`ide-panel-output${mobilePanel === 'output' ? ' mob-active' : ''}`}
-            style={{ flexDirection: 'column', overflow: 'hidden' }}>
+            style={{ flexDirection: 'column', overflow: 'hidden', display: 'flex' }}>
 
-            {/* Inject score history tab into OutputPanel via the existing activeTab/onTab props */}
             <OutputPanel
               activeTab={activeTab}
               onTab={setActiveTab}
@@ -912,28 +933,45 @@ Respond in this EXACT JSON format only, no other text:
               tests={tests}
               valResult={valResult}
               score={score}
-              /* NEW extra props — OutputPanel can ignore them if it doesn't use them yet */
               scoreHistory={scoreHistory}
             />
 
-            {/* Score history — rendered here if OutputPanel doesn't handle it */}
+            {/* Score history — only shown when OutputPanel passes 'score' tab through without rendering it */}
             {activeTab === 'score' && (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+              <div style={{
+                flex: 1, overflowY: 'auto', padding: '12px 14px',
+                borderTop: '1px solid var(--border)', background: 'var(--s1)',
+              }}>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                  Validation History
+                </div>
                 {scoreHistory.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--muted2)' }}>No validation runs yet.</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted2)' }}>
+                    No validation runs yet — run Validate to see scores here.
+                  </div>
                 ) : (
                   scoreHistory.map((s, i) => (
                     <div key={i} className="score-hist-row">
-                      <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 70 }}>Task {s.taskIdx + 1}</span>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', minWidth: 70 }}>
+                        Task {s.taskIdx + 1}
+                      </span>
                       <div className="score-hist-bar">
                         <div className="score-hist-fill" style={{
                           width: `${s.pct}%`,
                           background: s.pct >= 80 ? '#34D399' : s.pct >= 50 ? '#F59E0B' : '#F87171',
                         }} />
                       </div>
-                      <span style={{ fontSize: 11, color: 'var(--muted2)', minWidth: 34 }}>{s.pct}%</span>
+                      <span style={{ fontSize: 11, color: 'var(--muted2)', minWidth: 34, textAlign: 'right' }}>
+                        {s.pct}%
+                      </span>
                     </div>
                   ))
+                )}
+                {scoreHistory.length > 0 && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--accent3)', fontWeight: 700 }}>
+                    Best: {Math.max(...scoreHistory.map(s => s.pct))}% &nbsp;·&nbsp;
+                    Avg: {Math.round(scoreHistory.reduce((a, b) => a + b.pct, 0) / scoreHistory.length)}%
+                  </div>
                 )}
               </div>
             )}
@@ -943,18 +981,32 @@ Respond in this EXACT JSON format only, no other text:
           <div className={`ide-panel-team${mobilePanel === 'team' ? ' mob-active' : ''}`}
             style={{ flexDirection: 'column', overflow: 'hidden', display: 'flex' }}>
 
-            {/* TeamPanel renders its own agent cards */}
-            <TeamPanel
-              msgs={teamMsgs}
-              /* NEW: pass ping handler so TeamPanel can wire it up, or handle below */
-              onPing={handlePingAgent}
-            />
+            {/* Wrap TeamPanel in a capture div so clicks on any agent card bubble up to us */}
+            <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}
+              onClick={e => {
+                // Try to detect which agent card was clicked by reading data-role attribute
+                // TeamPanel sets msg keys: ba, pm, qa, devops, ops
+                const card = e.target.closest('[data-role]');
+                if (card) handlePingAgent(card.dataset.role);
+              }}>
+              <TeamPanel
+                msgs={teamMsgs}
+                onPing={handlePingAgent}
+              />
+            </div>
 
-            {/* Agent hint bubble — rendered outside TeamPanel so it always shows */}
+            {/* Agent hint bubble — always rendered below TeamPanel */}
             {agentHint && (
               <div className="agent-hint-bubble">
                 💬 <strong style={{ color: 'var(--accent)' }}>{agentHint.role.toUpperCase()}:</strong>{' '}
                 {agentHint.text}
+              </div>
+            )}
+
+            {/* "Click any agent for a hint" prompt — shown when no hint active */}
+            {!agentHint && (
+              <div style={{ padding: '6px 14px', fontSize: 11, color: 'var(--muted)', textAlign: 'center', borderTop: '1px solid var(--border)', background: 'var(--s1)' }}>
+                💡 Click any agent card for a hint
               </div>
             )}
 
