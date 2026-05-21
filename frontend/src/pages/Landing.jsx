@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ParticleField from '../components/effects/ParticleField';
-import GlowButton    from '../components/ui/GlowButton';
+import ParticleField from '../components/Effects/ParticleField';
+import GlowButton    from '../components/Ui/GlowButton';
 
 const TYPEWRITER_WORDS = [
   'Software Developer',
