@@ -12,10 +12,12 @@ require('express-async-errors');
 dotenv.config();
 
 console.log('🔧 ENV check:', {
-  MONGO_URI:  process.env.MONGO_URI  ? '✅ set' : '❌ MISSING',
-  JWT_SECRET: process.env.JWT_SECRET ? '✅ set' : '❌ MISSING',
-  NODE_ENV:   process.env.NODE_ENV   || 'undefined',
-  PORT:       process.env.PORT       || 5000,
+  MONGO_URI:     process.env.MONGO_URI     ? '✅ set' : '❌ MISSING',
+  JWT_SECRET:    process.env.JWT_SECRET    ? '✅ set' : '❌ MISSING',
+  RESEND_API_KEY:process.env.RESEND_API_KEY? '✅ set' : '❌ MISSING',
+  FRONTEND_URL:  process.env.FRONTEND_URL  || 'undefined',
+  NODE_ENV:      process.env.NODE_ENV      || 'undefined',
+  PORT:          process.env.PORT          || 5000,
 });
 
 // ── Load routes ───────────────────────────────────────────────
@@ -38,18 +40,30 @@ const allowedOrigins = [
   'http://localhost:5176',
   'http://localhost:5177',
   'http://localhost:3000',
+  // production domains — always hardcoded so they work even if env var is wrong
+  'https://simworkapp.com',
+  'https://www.simworkapp.com',
+  'https://simwork.vercel.app',
+  // dynamic from env (optional extra origin)
   process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
+    // allow requests with no origin (mobile apps, curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     console.warn(`⚠️  CORS blocked origin: ${origin}`);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// handle preflight OPTIONS requests for all routes
+app.options('*', cors());
 
 app.use(express.json());
 
@@ -72,7 +86,7 @@ app.get('/ping', (req, res) => res.json({ ok: true, time: new Date() }));
 
 app.use(errorHandler);
 
-// ── Start server — always, on both local and Render ───────────
+// ── Start server ──────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
   if (!process.env.MONGO_URI) {
     console.error('❌ MONGO_URI is not defined — cannot start.');
