@@ -16,8 +16,8 @@ export default function ResetPassword() {
     : password.length < 6  ? 1
     : password.length < 10 ? 2
     : /[A-Z]/.test(password) && /[0-9]/.test(password) ? 4 : 3;
-  const strengthLabel = ['', 'Too short', 'Weak',  'Good',    'Strong'];
-  const strengthColor = ['', '#F87171',   '#F59E0B','#60A5FA', '#34D399'];
+  const strengthLabel = ['','Too short','Weak','Good','Strong'];
+  const strengthColor = ['','#F87171','#F59E0B','#60A5FA','#34D399'];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,7 +25,8 @@ export default function ResetPassword() {
     if (password.length < 6)  return setMessage('Password must be at least 6 characters.');
     setStatus('loading');
     try {
-      const res = await API.post(`/auth/reset-password/${token}`, { password });
+      // same /api prefix as the rest of Auth.jsx
+      const res = await API.post(`/api/auth/reset-password/${token}`, { password });
       setMessage(res.data.message);
       setStatus('done');
       setTimeout(() => navigate('/auth'), 2500);
@@ -50,7 +51,7 @@ export default function ResetPassword() {
         ) : (
           <form onSubmit={handleSubmit} style={s.form}>
 
-            {/* ── New password ── */}
+            {/* New password */}
             <div style={{ textAlign:'left' }}>
               <label style={s.label}>New Password</label>
               <div style={{ position:'relative' }}>
@@ -62,7 +63,7 @@ export default function ResetPassword() {
                   required
                   style={{ ...s.input, paddingRight:44 }}
                 />
-                <button type="button" onClick={() => setShowPass(p => !p)} style={s.eye} title={showPass ? 'Hide' : 'Show'}>
+                <button type="button" onClick={() => setShowPass(p => !p)} style={s.eye}>
                   {showPass ? <EyeOff /> : <EyeOn />}
                 </button>
               </div>
@@ -76,7 +77,7 @@ export default function ResetPassword() {
               )}
             </div>
 
-            {/* ── Confirm password ── */}
+            {/* Confirm password */}
             <div style={{ textAlign:'left' }}>
               <label style={s.label}>Confirm Password</label>
               <div style={{ position:'relative' }}>
@@ -88,12 +89,10 @@ export default function ResetPassword() {
                   required
                   style={{
                     ...s.input, paddingRight:44,
-                    borderColor: confirm
-                      ? confirm === password ? '#34D399' : '#F87171'
-                      : undefined,
+                    borderColor: confirm ? (confirm === password ? '#34D399' : '#F87171') : undefined,
                   }}
                 />
-                <button type="button" onClick={() => setShowConf(p => !p)} style={s.eye} title={showConf ? 'Hide' : 'Show'}>
+                <button type="button" onClick={() => setShowConf(p => !p)} style={s.eye}>
                   {showConf ? <EyeOff /> : <EyeOn />}
                 </button>
               </div>
@@ -105,7 +104,7 @@ export default function ResetPassword() {
             </div>
 
             {message && (
-              <div style={{ ...s.err, color: status === 'error' ? '#F87171' : '#FBBF24' }}>
+              <div style={{ fontSize:13, color: status === 'error' ? '#F87171' : '#FBBF24', textAlign:'left' }}>
                 {message}
               </div>
             )}
@@ -122,7 +121,6 @@ export default function ResetPassword() {
   );
 }
 
-/* ── SVG eye icons ── */
 const EyeOn = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
@@ -146,6 +144,5 @@ const s = {
   eye:   { position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--muted2,#64748b)', padding:0, display:'flex', alignItems:'center' },
   btn:   { padding:'12px', background:'#7C6EFA', color:'#fff', border:'none', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:14, marginTop:4 },
   link:  { color:'#7C6EFA', fontSize:13, textDecoration:'none', marginTop:4 },
-  err:   { fontSize:13, textAlign:'left' },
   success: { color:'var(--text)', fontSize:14, lineHeight:1.8 },
 };

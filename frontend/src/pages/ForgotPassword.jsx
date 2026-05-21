@@ -12,7 +12,8 @@ export default function ForgotPassword() {
     if (!email.trim()) { setMessage('Please enter your email address.'); setStatus('error'); return; }
     setStatus('loading');
     try {
-      const res = await API.post('/auth/forgot-password', { email });
+      // baseURL = https://simwork.onrender.com  → full path = /api/auth/forgot-password
+      const res = await API.post('/api/auth/forgot-password', { email });
       setMessage(res.data.message);
       setStatus('done');
     } catch (err) {
