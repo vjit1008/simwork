@@ -1,7 +1,10 @@
 const jwt      = require('jsonwebtoken');
 const crypto   = require('crypto');
 const bcrypt   = require('bcryptjs');
-const User     = require('../models/User'); // ✅ only once
+const User     = require('../models/User');
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, {
   expiresIn: process.env.JWT_EXPIRES_IN || '7d',
@@ -14,18 +17,15 @@ const signup = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password)
       return res.status(400).json({ success: false, message: 'Please provide name, email and password.' });
-    }
-    if (password.length < 6) {
+    if (password.length < 6)
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
-    }
 
     const normalizedEmail = email.toLowerCase().trim();
     const existing = await User.findOne({ email: normalizedEmail });
-    if (existing) {
+    if (existing)
       return res.status(400).json({ success: false, message: 'An account with this email already exists.' });
-    }
 
     const user = await User.create({ name: name.trim(), email: normalizedEmail, password });
     console.log(`✅ New user created: ${user.email} (${user._id})`);
@@ -39,12 +39,10 @@ const signup = async (req, res) => {
 
   } catch (err) {
     console.error('❌ Signup error:', err);
-    if (err.name === 'ValidationError') {
+    if (err.name === 'ValidationError')
       return res.status(400).json({ success: false, message: Object.values(err.errors).map(e => e.message).join('. ') });
-    }
-    if (err.code === 11000) {
+    if (err.code === 11000)
       return res.status(400).json({ success: false, message: 'An account with this email already exists.' });
-    }
     return res.status(500).json({ success: false, message: 'Server error during signup.' });
   }
 };
@@ -56,9 +54,8 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (!email || !password)
       return res.status(400).json({ success: false, message: 'Please provide email and password.' });
-    }
 
     const normalizedEmail = email.toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail }).select('+password');
@@ -98,11 +95,12 @@ const forgotPassword = async (req, res) => {
     const normalizedEmail = email?.toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
 
+    // Don't reveal whether email exists — always return same message
     if (!user) {
-      // Don't reveal whether email exists
       return res.json({ success: true, message: 'If that email exists, a reset link has been sent.' });
     }
 
+    // Generate token
     const token  = crypto.randomBytes(32).toString('hex');
     const hashed = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -112,46 +110,51 @@ const forgotPassword = async (req, res) => {
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
-    const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-await resend.emails.send({
-  from:    'SimWork <onboarding@resend.dev>',
-  to:      user.email,
-  subject: 'Reset your SimWork password',
-  html: `
-    <div style="font-family:sans-serif;max-width:480px;margin:auto">
-      <h2 style="color:#7C6EFA">Reset your password</h2>
-      <p>Click the button below to reset your password. This link expires in <b>30 minutes</b>.</p>
-      <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#7C6EFA;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">
-        Reset Password
-      </a>
-      <p style="color:#888;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
-    </div>
-  `,
-});
-
-    await transporter.sendMail({
-      from:    `"SimWork" <${process.env.EMAIL_USER}>`,
+    // Send via Resend using verified simworkapp.com domain
+    const { error } = await resend.emails.send({
+      from:    'SimWork <noreply@simworkapp.com>',
       to:      user.email,
       subject: 'Reset your SimWork password',
       html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:auto">
-          <h2 style="color:#7C6EFA">Reset your password</h2>
-          <p>Click the button below to reset your password. This link expires in <b>30 minutes</b>.</p>
-          <a href="${resetUrl}" style="display:inline-block;padding:12px 28px;background:#7C6EFA;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">
-            Reset Password
+        <div style="font-family:sans-serif;max-width:480px;margin:40px auto;padding:32px;background:#0f1117;border-radius:12px;border:1px solid #1e2433">
+          <div style="margin-bottom:24px">
+            <span style="font-size:22px;font-weight:800;color:#7C6EFA">SimWork</span>
+          </div>
+          <h2 style="color:#e2e8f0;font-size:20px;margin:0 0 12px">Reset your password</h2>
+          <p style="color:#94a3b8;margin:0 0 24px;line-height:1.6">
+            We received a request to reset your password. Click the button below — 
+            this link expires in <b style="color:#e2e8f0">30 minutes</b>.
+          </p>
+          <a href="${resetUrl}"
+            style="display:inline-block;padding:13px 30px;background:#7C6EFA;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;margin-bottom:28px">
+            Reset Password →
           </a>
-          <p style="color:#888;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
+          <p style="color:#475569;font-size:12px;margin:0 0 6px">
+            Or copy this link into your browser:
+          </p>
+          <p style="color:#7C6EFA;font-size:12px;word-break:break-all;margin:0 0 24px">
+            ${resetUrl}
+          </p>
+          <hr style="border:none;border-top:1px solid #1e2433;margin:0 0 20px"/>
+          <p style="color:#475569;font-size:12px;margin:0">
+            If you didn't request a password reset, you can safely ignore this email. 
+            Your password will not be changed.
+          </p>
         </div>
       `,
     });
 
-    res.json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    if (error) {
+      console.error('❌ Resend error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to send reset email. Please try again.' });
+    }
+
+    console.log(`✅ Password reset email sent to ${user.email}`);
+    return res.json({ success: true, message: 'If that email exists, a reset link has been sent.' });
 
   } catch (err) {
     console.error('❌ forgotPassword error:', err);
-    res.status(500).json({ success: false, message: 'Failed to send email.' });
+    return res.status(500).json({ success: false, message: 'Failed to send email.' });
   }
 };
 
@@ -167,27 +170,25 @@ const resetPassword = async (req, res) => {
       resetPasswordExpire: { $gt: Date.now() },
     });
 
-    if (!user) {
+    if (!user)
       return res.status(400).json({ success: false, message: 'Token is invalid or has expired.' });
-    }
 
     const { password } = req.body;
-    if (!password || password.length < 6) {
+    if (!password || password.length < 6)
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
-    }
 
     user.password            = await bcrypt.hash(password, 10);
     user.resetPasswordToken  = undefined;
     user.resetPasswordExpire = undefined;
     await user.save();
 
-    res.json({ success: true, message: 'Password reset successful. You can now log in.' });
+    console.log(`✅ Password reset successful for ${user.email}`);
+    return res.json({ success: true, message: 'Password reset successful. You can now log in.' });
 
   } catch (err) {
     console.error('❌ resetPassword error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Export ALL four functions
 module.exports = { signup, login, forgotPassword, resetPassword };
