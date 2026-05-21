@@ -9,14 +9,10 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setMessage('Please enter your email address.');
-      setStatus('error');
-      return;
-    }
+    if (!email.trim()) { setMessage('Please enter your email address.'); setStatus('error'); return; }
     setStatus('loading');
     try {
-      const res = await API.post('/api/auth/forgot-password', { email });
+      const res = await API.post('/auth/forgot-password', { email });
       setMessage(res.data.message);
       setStatus('done');
     } catch (err) {
