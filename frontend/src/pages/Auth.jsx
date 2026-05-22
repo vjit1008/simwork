@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth }     from 'context/AuthContext';
-import { showToast }   from 'components/Toast';
-import API             from 'api/axios';
+import { useAuth }     from '../context/AuthContext';
+import { showToast }   from '../components/Toast';
+import API             from '../api/axios';
 import ParticleField   from 'components/Effects/ParticleField';
 import GlowButton      from 'components/Ui/GlowButton';
 import NeuralInput     from 'components/Ui/NeuralInput';
