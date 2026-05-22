@@ -11,35 +11,25 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    // ✅ Whitelist every field that any part of the app may update
     const ALLOWED = [
       'name', 'lname', 'city', 'role', 'skills',
       'college', 'degree', 'branch', 'gradyear',
       'notifications', 'privacy', 'avatarColor',
-      'xp', 'certs', 'preferredLanguage',          // ← IDE fields
+      'xp', 'certs', 'preferredLanguage',
     ];
-
-    // ✅ Build $set from only the keys that were actually sent
     const $set = {};
     for (const key of ALLOWED) {
-      if (req.body[key] !== undefined) {
-        $set[key] = req.body[key];
-      }
+      if (req.body[key] !== undefined) $set[key] = req.body[key];
     }
-
-    if (Object.keys($set).length === 0) {
+    if (Object.keys($set).length === 0)
       return res.status(400).json({ success: false, message: 'No valid fields to update.' });
-    }
 
     const updated = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set },
-      { new: true, runValidators: false }   // ← false: don't validate unrelated required fields
+      req.user._id, { $set }, { new: true, runValidators: false }
     ).select('-password');
 
-    if (!updated) {
+    if (!updated)
       return res.status(404).json({ success: false, message: 'User not found.' });
-    }
 
     res.json({ success: true, user: updated });
   } catch (err) {
@@ -48,4 +38,15 @@ const updateProfile = async (req, res) => {
   }
 };
 
-module.exports = { getProfile, updateProfile };
+// ✅ NEW
+const deleteAccount = async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.user._id);
+    res.json({ success: true, message: 'Account deleted.' });
+  } catch (err) {
+    console.error('❌ deleteAccount error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { getProfile, updateProfile, deleteAccount };

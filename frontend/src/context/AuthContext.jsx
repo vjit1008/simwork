@@ -10,52 +10,40 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const saved = localStorage.getItem('simwork_user_v3');
+    const saved  = localStorage.getItem('simwork_user_v3');
 
-    if (!token) {
-      // No token — not logged in, show app immediately
-      setLoading(false);
-      return;
-    }
+    if (!token) { setLoading(false); return; }
 
-    // Show stale data instantly (no visual flash)
     if (saved) {
       try { setUser(JSON.parse(saved)); } catch (e) {}
     }
 
-    // Silently sync fresh data from DB in background
-    API.get('/api/user/me')
+    // ✅ Fixed URL: /api/users/me (was /api/user/me)
+    API.get('/api/users/me')
       .then(({ data }) => {
         if (data.success) {
           setUser(data.user);
           localStorage.setItem('simwork_user_v3', JSON.stringify(data.user));
         }
       })
-      .catch(() => {
-        // Token expired/invalid — axios interceptor handles redirect to /login
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   const login = (userData, token) => {
-    localStorage.setItem('token', token);           // ← save token on login
+    localStorage.setItem('token', token);
     localStorage.setItem('simwork_user_v3', JSON.stringify(userData));
     setUser(userData);
   };
 
-  const update = async (partial) => {
+  // ✅ Fixed: update() now only updates local state.
+  //    Settings.jsx already handles the API call itself —
+  //    calling API.put a second time here caused the double-save + error toast.
+  const update = (userData) => {
+    setUser(userData);
     try {
-      const { data } = await API.put('/api/user/me', partial);
-      if (data.success) {
-        setUser(data.user);
-        try {
-          localStorage.setItem('simwork_user_v3', JSON.stringify(data.user));
-        } catch (e) {}
-      }
-    } catch (err) {
-      console.error('❌ Update failed:', err);
-      showToast('❌ Failed to save changes');
-    }
+      localStorage.setItem('simwork_user_v3', JSON.stringify(userData));
+    } catch (e) {}
   };
 
   const logout = () => {
@@ -68,11 +56,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user, login, update, logout,
-      loading,
-      isAuthenticated: !!user,
-    }}>
+    <AuthContext.Provider value={{ user, login, update, logout, loading, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
