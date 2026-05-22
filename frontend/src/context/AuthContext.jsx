@@ -15,7 +15,13 @@ export const AuthProvider = ({ children }) => {
     if (!token) { setLoading(false); return; }
 
     if (saved) {
-      try { setUser(JSON.parse(saved)); } catch (e) {}
+      try {
+    const parsed = JSON.parse(saved);
+    // If stale cache is missing profile fields, don't use it
+    if (parsed.name && parsed.email) {
+      setUser(parsed);
+    }
+  } catch (e) {}
     }
 
     // ✅ Fixed URL: /api/users/me (was /api/user/me)
