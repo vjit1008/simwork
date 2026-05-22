@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import GlassCard  from '../components/ui/GlassCard';
-import GlowButton  from '../components/ui/GlowButton';
-import StatCard    from '../components/ui/StatCard';
+import { useAuth } from 'context/AuthContext';
+import GlassCard  from 'components/Ui/GlassCard';
+import GlowButton  from 'components/Ui/GlowButton';
+import StatCard    from 'components/Ui/StatCard';
 
 const ACTIVITY = [
   { time: '2m ago',  text: 'Completed REST API task',      accent: '#00d4aa', icon: '✓' },
