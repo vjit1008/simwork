@@ -10,46 +10,67 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const saved  = localStorage.getItem('simwork_user_v3');
-
     if (!token) { setLoading(false); return; }
 
+    // Seed from cache immediately so UI isn't blank
+    const saved = localStorage.getItem('simwork_user_v3');
     if (saved) {
       try {
-    const parsed = JSON.parse(saved);
-    // If stale cache is missing profile fields, don't use it
-    if (parsed.name && parsed.email) {
-      setUser(parsed);
-    }
-  } catch (e) {}
+        const parsed = JSON.parse(saved);
+        if (parsed?.name && parsed?.email) setUser(parsed);
+      } catch (_) {}
     }
 
-    // ✅ Fixed URL: /api/users/me (was /api/user/me)
+    // Always re-fetch full profile from DB on app load
+    // This ensures XP, certs, education, city, role are up-to-date
     API.get('/api/users/me')
       .then(({ data }) => {
-        if (data.success) {
+        if (data.success && data.user) {
           setUser(data.user);
           localStorage.setItem('simwork_user_v3', JSON.stringify(data.user));
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        // token expired or network error — clear bad token
+        const cached = localStorage.getItem('simwork_user_v3');
+        if (!cached) {
+          localStorage.removeItem('token');
+          setUser(null);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const login = (userData, token) => {
-    localStorage.setItem('token', token);
+    if (token) {
+      localStorage.setItem('token', token);
+    }
     localStorage.setItem('simwork_user_v3', JSON.stringify(userData));
     setUser(userData);
+
+    // After login, fetch full profile from DB to get all fields
+    // (login endpoint may return minimal user object)
+    if (token) {
+      API.get('/api/users/me')
+        .then(({ data }) => {
+          if (data.success && data.user) {
+            setUser(data.user);
+            localStorage.setItem('simwork_user_v3', JSON.stringify(data.user));
+          }
+        })
+        .catch(() => {}); // silent — we already have basic data
+    }
   };
 
-  // ✅ Fixed: update() now only updates local state.
-  //    Settings.jsx already handles the API call itself —
-  //    calling API.put a second time here caused the double-save + error toast.
+  // ✅ update() — only updates local state + localStorage.
+  //    Callers (Settings, IDEPage) handle their own API.put() calls.
+  //    This prevents the double-save "Failed to save" toast.
   const update = (userData) => {
-    setUser(userData);
+    const merged = { ...user, ...userData };
+    setUser(merged);
     try {
-      localStorage.setItem('simwork_user_v3', JSON.stringify(userData));
-    } catch (e) {}
+      localStorage.setItem('simwork_user_v3', JSON.stringify(merged));
+    } catch (_) {}
   };
 
   const logout = () => {
@@ -58,7 +79,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('simwork_user_v3');
       localStorage.removeItem('simwork_sims_v3');
-    } catch (e) {}
+    } catch (_) {}
   };
 
   return (

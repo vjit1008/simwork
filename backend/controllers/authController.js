@@ -28,11 +28,13 @@ const signup = async (req, res) => {
     const user = await User.create({ name: name.trim(), email: normalizedEmail, password });
     console.log(`✅ New user created: ${user.email}`);
 
+    // Return full profile so AuthContext is complete from the start
+    const fullUser = await User.findById(user._id).select('-password -resetPasswordToken -resetPasswordExpire');
     return res.status(201).json({
       success: true,
       message: 'Account created successfully.',
       token: generateToken(user._id),
-      user: { id: user._id, name: user.name, email: user.email },
+      user: fullUser,
     });
   } catch (err) {
     console.error('❌ Signup error:', err);
@@ -60,11 +62,17 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
 
     console.log(`✅ User logged in: ${user.email}`);
+
+    // ✅ Return FULL profile (not just id/name/email)
+    // Fixes: Profile page showing 0 XP, empty education, no certs after login
+    const fullUser = await User.findById(user._id)
+      .select('-password -resetPasswordToken -resetPasswordExpire');
+
     return res.json({
       success: true,
       message: 'Login successful.',
       token: generateToken(user._id),
-      user: { id: user._id, name: user.name, email: user.email },
+      user: fullUser,
     });
   } catch (err) {
     console.error('❌ Login error:', err);
@@ -151,8 +159,8 @@ const resetPassword = async (req, res) => {
     if (!password || password.length < 6)
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
 
-    // ✅ Assign plain text — User model pre-save hook hashes it (bcrypt x1)
-    // ❌ Do NOT call bcrypt.hash here — that would double-hash and break login
+    // ✅ Assign plain text — User model pre-save hook hashes it once
+    // ❌ Do NOT bcrypt.hash manually — that double-hashes and breaks login
     user.password            = password;
     user.resetPasswordToken  = undefined;
     user.resetPasswordExpire = undefined;

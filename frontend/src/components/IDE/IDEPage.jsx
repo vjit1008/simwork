@@ -270,7 +270,7 @@ export default function IDEPage() {
   const runCode = async () => {
     if (isRunning) return;
     setIsRunning(true);
-    setOutput(p => [...p, { type: 'info', text: '$ Running code analysis...' }]);
+    setOutput([{ type: 'info', text: '$ Running code analysis...' }]); // reset on each run
     setActiveTab('console');
     setTeamMsgs(p => ({ ...p, dev: '⟳ Running your code…' }));
 
@@ -433,11 +433,11 @@ Respond in this EXACT JSON format only, no other text:
     finishSubmit(auto ? 25 : Math.max(score, 50), score, auto);
   };
 
-  const finishSubmit = (sc, _rawScore, _auto) => {
+  const finishSubmit = async (sc, _rawScore, _auto) => {
     const xpPerTask = Math.round((currentSim.totalXP / 3 / tasks.length) * stageInfo.xpMult);
     const xpEarned  = Math.round((sc / 100) * xpPerTask);
-    update({ xp: (user?.xp || 0) + xpEarned });
-    setXpAnim(true); setTimeout(() => setXpAnim(false), 1000); // NEW: flash
+    const newXp     = (user?.xp || 0) + xpEarned;
+    setXpAnim(true); setTimeout(() => setXpAnim(false), 1000);
 
     const newResults = { ...taskResults, [currentTask]: { score: sc, xpEarned } };
     setTaskResults(newResults);
@@ -456,10 +456,31 @@ Respond in this EXACT JSON format only, no other text:
 
     if (currentTask === tasks.length - 1) {
       const avg = Math.round(Object.values(newResults).reduce((a, b) => a + (b.score || 0), 0) / Object.keys(newResults).length);
-      const cert = { id: `CERT-${currentSim.id.toUpperCase()}-${currentStage.slice(0, 3).toUpperCase()}-${String(Date.now()).slice(-4)}`, title: `${currentSim.title} (${stageInfo.label})`, icon: currentSim.icon, color: currentSim.color, score: avg, stage: currentStage, date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) };
-      update({ certs: [...(user?.certs || []), cert] });
+      const cert = {
+        id:    `CERT-${currentSim.id.toUpperCase()}-${currentStage.slice(0, 3).toUpperCase()}-${String(Date.now()).slice(-4)}`,
+        title: `${currentSim.title} (${stageInfo.label})`,
+        icon:  currentSim.icon, color: currentSim.color, score: avg,
+        stage: currentStage,
+        date:  new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      };
+      const newCerts = [...(user?.certs || []), cert];
+      // Update local state immediately
+      update({ ...user, xp: newXp, certs: newCerts });
+      // ✅ Persist XP + cert to DB — fixes Profile/Leaderboard showing 0 XP
+      try {
+        const API = (await import('../../api/axios')).default;
+        const { data } = await API.put('/api/users/me', { xp: newXp, certs: newCerts });
+        if (data?.user) update(data.user);
+      } catch (e) { console.warn('[SimWork] XP/cert DB sync failed:', e.message); }
       setModalStage({ cert, avg });
     } else {
+      // ✅ Persist XP after every non-final task too
+      update({ ...user, xp: newXp });
+      try {
+        const API = (await import('../../api/axios')).default;
+        const { data } = await API.put('/api/users/me', { xp: newXp });
+        if (data?.user) update(data.user);
+      } catch (e) { console.warn('[SimWork] XP DB sync failed:', e.message); }
       setModalDone({ score: sc, xpEarned });
     }
   };
