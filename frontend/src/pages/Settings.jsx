@@ -5,74 +5,103 @@ import API from '../api/axios';
 
 const AVATAR_COLORS = [
   '#7C6EFA','#34D399','#F59E0B',
-  '#F87171','#60A5FA','#A78BFA','#EC4899'
+  '#F87171','#60A5FA','#A78BFA','#EC4899',
 ];
 
 const SECTIONS = ['Account','Education','Notifications','Privacy','Danger Zone'];
 
+// Build form state from a user object
+const buildForm = (u) => ({
+  name:          u?.name          || '',
+  email:         u?.email         || '',
+  city:          u?.city          || '',
+  role:          u?.role          || '',
+  avatarColor:   u?.avatarColor   || '#7C6EFA',
+  college:       u?.college       || '',
+  degree:        u?.degree        || '',
+  branch:        u?.branch        || '',
+  gradyear:      u?.gradyear      || '',
+  skills:        Array.isArray(u?.skills)
+                   ? u.skills.join(', ')
+                   : (u?.skills || ''),
+  notifications: u?.notifications || { email: true, browser: true, weekly: true },
+  privacy:       u?.privacy       || { publicProfile: true, showEducation: true, showOnLeaderboard: true },
+});
+
 export default function Settings() {
   const { user, update, logout } = useAuth();
-  const [section, setSection] = useState('Account');
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    name:        user?.name        || '',
-    email:       user?.email       || '',
-    city:        user?.city        || '',
-    role:        user?.role        || '',
-    avatarColor: user?.avatarColor || '#7C6EFA',
-    college:     user?.college     || '',
-    degree:      user?.degree      || '',
-    branch:      user?.branch      || '',
-    gradyear:    user?.gradyear    || '',
-    skills:      Array.isArray(user?.skills) ? user.skills.join(', ') : '',
-    notifications: user?.notifications || { email: true, browser: true, weekly: true },
-    privacy:       user?.privacy       || { publicProfile: true, showEducation: true, showOnLeaderboard: true },
-  });
+  const [section,  setSection]   = useState('Account');
+  const [saving,   setSaving]    = useState(false);
+  const [loading,  setLoading]   = useState(true);
+  const [form,     setForm]      = useState(buildForm(user));
 
-  // Sync form if user context updates
+  // ✅ Always fetch fresh profile from DB on mount
+  // Fixes: form fields empty even though data exists in DB
+  // Fixes: form showing stale cached data after Settings save
   useEffect(() => {
-    if (user) {
-      setForm(f => ({
-        ...f,
-        name:        user.name        || '',
-        email:       user.email       || '',
-        city:        user.city        || '',
-        role:        user.role        || '',
-        avatarColor: user.avatarColor || '#7C6EFA',
-        college:     user.college     || '',
-        degree:      user.degree      || '',
-        branch:      user.branch      || '',
-        gradyear:    user.gradyear    || '',
-        skills:      Array.isArray(user.skills) ? user.skills.join(', ') : '',
-        notifications: user.notifications || { email: true, browser: true, weekly: true },
-        privacy:       user.privacy       || { publicProfile: true, showEducation: true, showOnLeaderboard: true },
-      }));
-    }
-  }, [user]);
+    setLoading(true);
+    API.get('/api/users/me')
+      .then(({ data }) => {
+        if (data.success && data.user) {
+          update(data.user);           // sync AuthContext
+          setForm(buildForm(data.user)); // populate form with real DB values
+        }
+      })
+      .catch(() => {
+        // Fallback to whatever is in AuthContext
+        if (user) setForm(buildForm(user));
+      })
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const set    = (key, val) => setForm(f => ({ ...f, [key]: val }));
   const setNot = (key, val) => setForm(f => ({ ...f, notifications: { ...f.notifications, [key]: val } }));
-  const setPri = (key, val) => setForm(f => ({ ...f, privacy: { ...f.privacy, [key]: val } }));
+  const setPri = (key, val) => setForm(f => ({ ...f, privacy:       { ...f.privacy,       [key]: val } }));
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const payload = {
         ...form,
-        skills: form.skills.split(',').map(s => s.trim()).filter(Boolean),
+        skills: typeof form.skills === 'string'
+          ? form.skills.split(',').map(s => s.trim()).filter(Boolean)
+          : form.skills,
       };
       const { data } = await API.put('/api/users/me', payload);
-      update(data.user);
-      showToast('Settings saved! ✅');
+      if (data.success && data.user) {
+        update(data.user);             // sync AuthContext with DB response
+        setForm(buildForm(data.user)); // re-populate form so it matches DB
+        showToast('Settings saved! ✅');
+      } else {
+        showToast('Saved ✅');
+      }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to save. Try again.');
+      const msg = err.response?.data?.message || 'Failed to save. Try again.';
+      showToast(`❌ ${msg}`);
     } finally {
       setSaving(false);
     }
   };
 
   const initials = (form.name || 'U')
-    .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    .split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+  // Skeleton while loading fresh data
+  if (loading) return (
+    <div style={{ padding: '24px 28px', maxWidth: 900, margin: '0 auto' }}>
+      <h2 style={s.pageTitle}>⚙️ Settings</h2>
+      <div style={{ display: 'flex', gap: 24 }}>
+        <div style={{ width: 180, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {SECTIONS.map(sec => (
+            <div key={sec} style={{ ...s.navItem, background: 'var(--s2)', animation: 'sk-pulse 1.5s infinite' }} />
+          ))}
+        </div>
+        <div style={{ flex: 1, background: 'var(--s2)', borderRadius: 14, padding: 28, border: '1px solid var(--border2)', minHeight: 300, animation: 'sk-pulse 1.5s infinite' }} />
+      </div>
+      <style>{`@keyframes sk-pulse{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
+    </div>
+  );
 
   return (
     <div style={s.page}>
@@ -82,11 +111,9 @@ export default function Settings() {
         {/* Sidebar */}
         <div style={s.sidebar}>
           {SECTIONS.map(sec => (
-            <div
-              key={sec}
+            <div key={sec}
               style={{ ...s.navItem, ...(section === sec ? s.navActive : {}) }}
-              onClick={() => setSection(sec)}
-            >
+              onClick={() => setSection(sec)}>
               {sec === 'Account'       && '👤 '}
               {sec === 'Education'     && '🎓 '}
               {sec === 'Notifications' && '🔔 '}
@@ -108,23 +135,17 @@ export default function Settings() {
 
               {/* Avatar */}
               <div style={s.avatarRow}>
-                <div style={{ ...s.avatar, background: form.avatarColor }}>
-                  {initials}
-                </div>
+                <div style={{ ...s.avatar, background: form.avatarColor }}>{initials}</div>
                 <div>
                   <p style={s.label}>Avatar Color</p>
                   <div style={s.colorRow}>
                     {AVATAR_COLORS.map(c => (
-                      <div
-                        key={c}
-                        onClick={() => set('avatarColor', c)}
+                      <div key={c} onClick={() => set('avatarColor', c)}
                         style={{
-                          ...s.colorDot,
-                          background: c,
+                          ...s.colorDot, background: c,
                           outline: form.avatarColor === c ? `3px solid ${c}` : 'none',
                           outlineOffset: 2,
-                        }}
-                      />
+                        }} />
                     ))}
                   </div>
                 </div>
@@ -133,7 +154,9 @@ export default function Settings() {
               <div style={s.grid2}>
                 <div>
                   <p style={s.label}>Full Name</p>
-                  <input style={s.inp} value={form.name} onChange={e => set('name', e.target.value)} />
+                  <input style={s.inp} value={form.name}
+                    onChange={e => set('name', e.target.value)}
+                    placeholder="Your name" />
                 </div>
                 <div>
                   <p style={s.label}>Email</p>
@@ -141,13 +164,15 @@ export default function Settings() {
                 </div>
                 <div>
                   <p style={s.label}>City</p>
-                  <input style={s.inp} value={form.city} onChange={e => set('city', e.target.value)} placeholder="e.g. Pune" />
+                  <input style={s.inp} value={form.city}
+                    onChange={e => set('city', e.target.value)}
+                    placeholder="e.g. Pune" />
                 </div>
                 <div>
                   <p style={s.label}>Target Role</p>
                   <select style={s.sel} value={form.role} onChange={e => set('role', e.target.value)}>
                     <option value="">Select...</option>
-                    {['Software Developer','Data Scientist','Finance Analyst','UI/UX Designer','DevOps Engineer','AI Engineer'].map(r => (
+                    {['Software Developer','Data Scientist','Finance Analyst','UI/UX Designer','DevOps Engineer','Product Manager','AI Engineer'].map(r => (
                       <option key={r}>{r}</option>
                     ))}
                   </select>
@@ -155,12 +180,9 @@ export default function Settings() {
               </div>
 
               <p style={s.label}>Skills (comma separated)</p>
-              <input
-                style={s.inp}
-                value={form.skills}
+              <input style={s.inp} value={form.skills}
                 onChange={e => set('skills', e.target.value)}
-                placeholder="JavaScript, Python, React, SQL"
-              />
+                placeholder="JavaScript, Python, React, SQL" />
 
               <button style={s.saveBtn} onClick={handleSave} disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -175,7 +197,9 @@ export default function Settings() {
               <p style={s.sectionSub}>Your academic background</p>
 
               <p style={s.label}>College / University</p>
-              <input style={s.inp} value={form.college} onChange={e => set('college', e.target.value)} placeholder="e.g. Pune University" />
+              <input style={s.inp} value={form.college}
+                onChange={e => set('college', e.target.value)}
+                placeholder="e.g. Pune University" />
 
               <div style={s.grid2}>
                 <div>
@@ -189,11 +213,15 @@ export default function Settings() {
                 </div>
                 <div>
                   <p style={s.label}>Branch / Stream</p>
-                  <input style={s.inp} value={form.branch} onChange={e => set('branch', e.target.value)} placeholder="e.g. Computer Science" />
+                  <input style={s.inp} value={form.branch}
+                    onChange={e => set('branch', e.target.value)}
+                    placeholder="e.g. Computer Science" />
                 </div>
                 <div>
                   <p style={s.label}>Graduation Year</p>
-                  <input type="number" style={s.inp} value={form.gradyear} onChange={e => set('gradyear', e.target.value)} placeholder="e.g. 2025" min="1990" max="2035" />
+                  <input type="number" style={s.inp} value={form.gradyear}
+                    onChange={e => set('gradyear', e.target.value)}
+                    placeholder="e.g. 2025" min="1990" max="2035" />
                 </div>
               </div>
 
@@ -208,7 +236,6 @@ export default function Settings() {
             <div>
               <h3 style={s.sectionTitle}>Notifications</h3>
               <p style={s.sectionSub}>Choose what you want to be notified about</p>
-
               {[
                 { key: 'email',   label: 'Email notifications',   sub: 'Receive updates and alerts via email' },
                 { key: 'browser', label: 'Browser notifications', sub: 'Push notifications in your browser' },
@@ -219,15 +246,12 @@ export default function Settings() {
                     <p style={s.toggleLabel}>{item.label}</p>
                     <p style={s.toggleSub}>{item.sub}</p>
                   </div>
-                  <div
-                    style={{ ...s.toggle, background: form.notifications[item.key] ? '#7C6EFA' : 'var(--border2)' }}
-                    onClick={() => setNot(item.key, !form.notifications[item.key])}
-                  >
+                  <div style={{ ...s.toggle, background: form.notifications[item.key] ? '#7C6EFA' : 'var(--border2)' }}
+                    onClick={() => setNot(item.key, !form.notifications[item.key])}>
                     <div style={{ ...s.toggleKnob, transform: form.notifications[item.key] ? 'translateX(20px)' : 'translateX(0)' }} />
                   </div>
                 </div>
               ))}
-
               <button style={s.saveBtn} onClick={handleSave} disabled={saving}>
                 {saving ? 'Saving...' : 'Save Preferences'}
               </button>
@@ -239,26 +263,22 @@ export default function Settings() {
             <div>
               <h3 style={s.sectionTitle}>Privacy</h3>
               <p style={s.sectionSub}>Control who can see your profile</p>
-
               {[
-                { key: 'publicProfile',       label: 'Public profile',         sub: 'Anyone can view your SimWork profile' },
-                { key: 'showEducation',        label: 'Show education',         sub: 'Display your college and degree on profile' },
-                { key: 'showOnLeaderboard',    label: 'Show on leaderboard',    sub: 'Appear in the public XP rankings' },
+                { key: 'publicProfile',    label: 'Public profile',      sub: 'Anyone can view your SimWork profile' },
+                { key: 'showEducation',    label: 'Show education',      sub: 'Display your college and degree on profile' },
+                { key: 'showOnLeaderboard',label: 'Show on leaderboard', sub: 'Appear in the public XP rankings' },
               ].map(item => (
                 <div key={item.key} style={s.toggleRow}>
                   <div>
                     <p style={s.toggleLabel}>{item.label}</p>
                     <p style={s.toggleSub}>{item.sub}</p>
                   </div>
-                  <div
-                    style={{ ...s.toggle, background: form.privacy[item.key] ? '#7C6EFA' : 'var(--border2)' }}
-                    onClick={() => setPri(item.key, !form.privacy[item.key])}
-                  >
+                  <div style={{ ...s.toggle, background: form.privacy[item.key] ? '#7C6EFA' : 'var(--border2)' }}
+                    onClick={() => setPri(item.key, !form.privacy[item.key])}>
                     <div style={{ ...s.toggleKnob, transform: form.privacy[item.key] ? 'translateX(20px)' : 'translateX(0)' }} />
                   </div>
                 </div>
               ))}
-
               <button style={s.saveBtn} onClick={handleSave} disabled={saving}>
                 {saving ? 'Saving...' : 'Save Privacy'}
               </button>
@@ -270,7 +290,6 @@ export default function Settings() {
             <div>
               <h3 style={{ ...s.sectionTitle, color: '#F87171' }}>Danger Zone</h3>
               <p style={s.sectionSub}>These actions are irreversible. Please be careful.</p>
-
               <div style={s.dangerCard}>
                 <div>
                   <p style={s.toggleLabel}>Sign out of all devices</p>
@@ -278,7 +297,6 @@ export default function Settings() {
                 </div>
                 <button style={s.dangerBtn} onClick={logout}>Sign Out</button>
               </div>
-
               <div style={{ ...s.dangerCard, marginTop: 12, borderColor: '#F87171' }}>
                 <div>
                   <p style={{ ...s.toggleLabel, color: '#F87171' }}>Delete account</p>
@@ -290,8 +308,7 @@ export default function Settings() {
                     if (window.confirm('Are you sure? This cannot be undone.')) {
                       API.delete('/api/users/me').then(() => logout());
                     }
-                  }}
-                >
+                  }}>
                   Delete
                 </button>
               </div>
