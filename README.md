@@ -8,7 +8,7 @@
 
 **AI-powered job simulation platform that bridges the gap between education and employment.**
 
-[![Live Demo](https://img.shields.io/badge/Live-simwork.vercel.app-34D399?style=flat-square&logo=vercel)](https://www.simworkapp.com/)
+[![Live Demo](https://img.shields.io/badge/Live-simworkapp.com-34D399?style=flat-square&logo=vercel)](https://www.simworkapp.com/)
 [![License](https://img.shields.io/badge/License-Custom-F59E0B?style=flat-square)](./LICENSE)
 [![Built With](https://img.shields.io/badge/Built%20With-React%20%2B%20Node.js-7C6EFA?style=flat-square&logo=react)](https://www.simworkapp.com/)
 [![AI](https://img.shields.io/badge/AI-Gemini%202.0-4285F4?style=flat-square&logo=google)](https://www.simworkapp.com/)
