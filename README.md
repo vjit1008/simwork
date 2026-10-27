@@ -202,8 +202,8 @@ http://localhost:5173
 ## 👤 Author
 
 **Vishvajit Gadakari**  
-🌐 [simwork.vercel.app](https://www.simworkapp.com/)  
-📧 vjit1008@simwork.in  
+🌐 [https://img.shields.io/badge/Live-simworkapp.com-34D399?style=flat-square&logo=Simworkapp](https://www.simworkapp.com/)  
+📧 vjit1008@simworkapp.in  
 🐙 [@vjit1008](https://github.com/vjit1008)
 
 ---
